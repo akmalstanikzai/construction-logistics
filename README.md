@@ -1,16 +1,34 @@
-# React + Vite
+# Asma Afghan
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React/Vite investor register with Supabase Auth and database records. NIC PDFs are kept in a private Cloudflare R2 bucket and served through an authenticated Worker.
 
-Currently, two official plugins are available:
+## Local setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```sh
+npm install
+npm run dev
+```
 
-## React Compiler
+The local `.env` has `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The ignored `.env.local` has `VITE_R2_WORKER_URL` (see `.env.example`). Restart Vite after changing either file.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Apply the SQL migrations in `supabase/migrations/` in filename order. Migration 003 grants investor access to every authenticated user, and migration 004 fixes investor creation. If you already applied the first three migrations, apply only `202611070004_fix_create_investor_contacts.sql` now. Cloudflare R2 setup and deployment details are in `cloudflare/r2-worker/README.md`.
 
-## Expanding the Oxlint configuration
+## Current R2 connection
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+The app's local `.env.local` points to `https://asma-afghan-investor-documents.asma-afghan-0b6224dd.workers.dev`. The Worker is bound to the private `asma-afghan-investor-nics` bucket. Its `APP_ORIGINS` setting currently allows local Vite ports 5173 and 5174 on `localhost` and `127.0.0.1`. Add the production frontend origin in `cloudflare/r2-worker/wrangler.toml` and redeploy the Worker before using it from a hosted app.
+
+## Deploy to Vercel
+
+Import this repository into Vercel with the Vite framework preset. The build command is `npm run build` and the output directory is `dist`. `vercel.json` enables direct loading and refreshes of app routes.
+
+In **Project Settings → Environment Variables**, set these for Production (and Preview if you use previews):
+
+```dotenv
+VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+VITE_R2_WORKER_URL=https://asma-afghan-investor-documents.asma-afghan-0b6224dd.workers.dev
+```
+
+Use the Supabase project URL and publishable key from your own project. Vite embeds these values at build time, so redeploy after changing them. Never put a Supabase secret/service-role key in a `VITE_` variable.
+
+After Vercel gives you a production URL, add its exact origin (for example, `https://your-project.vercel.app`) to `APP_ORIGINS` in `cloudflare/r2-worker/wrangler.toml`, then redeploy the Worker with `npx wrangler deploy --config cloudflare/r2-worker/wrangler.toml`. Include any custom domain origin you use. Without this step, investor records work but NIC PDF requests from production are blocked by the Worker.

@@ -1,0 +1,12 @@
+name = "asma-afghan-investor-documents"
+main = "src/index.js"
+compatibility_date = "2026-11-07"
+
+[vars]
+# Comma-separated frontend origins, with no trailing slashes. Add your production origin before deployment.
+APP_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
+# Set these with `wrangler secret put`, not as plaintext vars.
+
+[[r2_buckets]]
+binding = "NIC_DOCUMENTS"
+bucket_name = "asma-afghan-investor-nics"

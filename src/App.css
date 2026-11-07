@@ -51,3 +51,81 @@ form label { display: block; margin-bottom: 9px; font-size: 12px; color: #334a62
 @media (max-width: 900px) and (min-width: 681px) { .login-page { grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); } .visual-panel { padding-inline: 7%; } .visual-panel h1 { font-size: clamp(36px, 5vw, 54px); } .form-panel { padding-inline: 34px; } }
 @media (max-width: 680px) { .login-page { display: grid; grid-template-columns: 1fr; grid-template-rows: minmax(190px, 30vh) 1fr; min-height: 100vh; background: #f5f8fc; } .visual-panel { min-height: 190px; padding: 28px 25px; } .visual-panel h1 { font-size: clamp(34px, 9vw, 48px); } .visual-grid { background-size: 48px 48px; } .form-panel { min-height: 70vh; padding: 36px 25px 22px; } .form-wrap { width: min(100%, 390px); } .mobile-brand { display: none; } .form-heading { margin-bottom: 28px; } .form-heading h2 { font-size: 31px; } .form-footer { width: min(100%, 390px); margin: 25px auto 0; font-size: 8px; } .form-footer span:last-child { font-size: 7px; } .dashboard-sidebar { width: 72px; flex-basis: 72px; padding: 20px 10px 14px; align-items: center; } .dashboard-brand { padding: 0 0 27px; } .dashboard-brand > span, .sidebar-link span, .sidebar-sign-out span { display: none; } .sidebar-link { width: 48px; justify-content: center; padding: 0; } .sidebar-sign-out { width: 48px; justify-content: center; padding-inline: 0; } .dashboard-content { padding: 14px; } .investors-page { min-height: calc(100vh - 28px); } }
 @media (max-width: 420px) { .login-page { grid-template-rows: minmax(170px, 25vh) 1fr; } .visual-panel { min-height: 170px; padding: 25px 22px; } .form-panel { min-height: 75vh; padding: 30px 22px 20px; } .form-heading h2 { font-size: 29px; } .secure-note { font-size: 10px; } .form-footer { letter-spacing: .02em; } .form-footer span:last-child { letter-spacing: .06em; } }
+
+/* Investors register */
+.investors-page { min-height: calc(100vh - 56px); padding: 30px 34px; background: #f7f9fc; border: 1px solid #e2eaf2; border-radius: 6px; overflow: auto; }
+.investors-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; padding-bottom: 25px; border-bottom: 1px solid #e3eaf2; }
+.investors-eyebrow { margin: 0 0 8px; color: #6d91b6; font-size: 9px; font-weight: 700; letter-spacing: .17em; }
+.investors-header h1 { margin: 0; color: #183d63; font: 700 30px/1.2 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.04em; }
+.investors-subtitle { margin: 7px 0 0; color: #7c8fa3; font-size: 13px; }
+.add-investor-button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border: 0; border-radius: 4px; background: #1761a3; color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; transition: background .2s, transform .2s; }
+.add-investor-button:hover:not(:disabled) { background: #104d86; transform: translateY(-1px); }
+.add-investor-button:disabled { opacity: .65; cursor: wait; }
+.add-investor-button > span { font-size: 18px; font-weight: 400; line-height: 1; }
+.investor-list-heading { display: flex; align-items: center; gap: 11px; margin: 26px 0 15px; }
+.investor-list-heading h2 { margin: 0; color: #294966; font: 700 14px 'Manrope', sans-serif; }
+.investor-list-heading > span { padding: 3px 8px; border-radius: 20px; color: #587b9c; background: #e8f1f9; font-size: 10px; }
+.investor-cards { display: grid; gap: 13px; }
+.investor-card { padding: 18px 20px 19px; border: 1px solid #e1e8ef; border-radius: 5px; background: #fff; box-shadow: 0 2px 7px rgba(29,68,104,.025); }
+.investor-card-top { display: flex; align-items: center; gap: 12px; }
+.investor-avatar { display: grid; place-items: center; width: 39px; height: 39px; flex: 0 0 39px; border-radius: 50%; background: #e7f1fa; color: #2c679f; font: 700 12px 'Manrope', sans-serif; }
+.investor-name { min-width: 0; }
+.investor-name h2 { margin: 0; color: #1d3c5a; font: 700 14px 'Manrope', sans-serif; }
+.investor-name span { display: block; margin-top: 3px; color: #8999a8; font-size: 10px; }
+.nic-button { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 7px 10px; border: 1px solid #d5e3f0; border-radius: 4px; color: #28689f; background: #f7fbff; font-size: 10px; font-weight: 600; }
+.nic-button:hover:not(:disabled) { background: #eaf4fc; }
+.nic-button:disabled { opacity: .6; cursor: wait; }
+.nic-upload-button { cursor: pointer; }
+.nic-upload-button input { display: none; }
+.nic-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.nic-missing { margin-left: auto; color: #98a5b0; font-size: 10px; }
+.investor-details { display: grid; grid-template-columns: 1fr .8fr 1fr; gap: 18px; margin-top: 18px; padding-top: 15px; border-top: 1px solid #edf1f5; }
+.investor-details > div { min-width: 0; }
+.detail-label { display: block; margin-bottom: 5px; color: #8b9aa8; font-size: 10px; }
+.investor-details p { margin: 0; overflow-wrap: anywhere; color: #354f67; font-size: 12px; line-height: 1.55; }
+.investors-state { display: grid; min-height: 190px; place-items: center; }
+.investors-empty { display: flex; min-height: 330px; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.empty-icon { display: grid; place-items: center; width: 52px; height: 52px; margin-bottom: 14px; border-radius: 50%; color: #4b86bb; background: #e8f2fb; }
+.empty-icon svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.investors-empty h2 { margin: 0; color: #294966; font: 700 15px 'Manrope', sans-serif; }
+.investors-empty p { margin: 7px 0 17px; color: #8797a6; font-size: 12px; }
+.add-investor-button.secondary { min-height: 37px; }
+.investors-notice, .investors-alert { margin-top: 16px; padding: 11px 13px; border-radius: 4px; font-size: 12px; }
+.investors-notice { border: 1px solid #c8e5d8; color: #26724f; background: #f0faf5; }
+.investors-alert { border: 1px solid #efd1d1; color: #a04545; background: #fff6f6; }
+.modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; overflow-y: auto; padding: 22px; background: rgba(13,35,58,.48); backdrop-filter: blur(2px); }
+.investor-modal { width: min(100%, 610px); max-height: min(92vh, 900px); overflow-y: auto; border-radius: 7px; background: #fff; box-shadow: 0 18px 60px rgba(8,34,60,.24); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 25px 17px; border-bottom: 1px solid #e8edf2; }
+.modal-header .investors-eyebrow { margin-bottom: 5px; }
+.modal-header h2 { margin: 0; color: #183d63; font: 700 21px 'Manrope', sans-serif; letter-spacing: -.03em; }
+.modal-close { width: 32px; height: 32px; border: 0; border-radius: 4px; color: #7d8d9b; background: transparent; font-size: 24px; line-height: 1; }
+.modal-close:hover:not(:disabled) { color: #234866; background: #f0f5f9; }
+.investor-form { padding: 19px 25px 23px; }
+.form-section-title { display: block; margin: 0 0 12px; color: #3b5973; font-size: 11px; font-weight: 700; }
+.form-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.investor-form label { display: block; margin: 0; color: #405a72; font-size: 11px; font-weight: 600; }
+.investor-form input:not([type=file]) { display: block; width: 100%; height: 39px; margin-top: 7px; padding: 0 11px; border: 1px solid #d9e3ec; border-radius: 4px; outline: 0; color: #213e59; background: #fff; font-size: 12px; }
+.investor-form input:focus { border-color: #5792cc; box-shadow: 0 0 0 3px rgba(65,132,193,.1); }
+.investor-form input::placeholder { color: #a8b5c1; }
+.dynamic-field-group { margin-top: 17px; }
+.dynamic-field-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; color: #405a72; font-size: 11px; font-weight: 600; }
+.dynamic-field-heading button { padding: 3px 0; border: 0; color: #2471ae; background: transparent; font-size: 10px; font-weight: 600; }
+.dynamic-field-heading button:hover { color: #124b7d; }
+.phone-input-row { display: flex; align-items: center; gap: 7px; margin-top: 7px; }
+.phone-input-row input { margin-top: 0 !important; }
+.phone-input-row > button { width: 31px; height: 31px; flex: 0 0 31px; border: 1px solid #e4eaf0; border-radius: 4px; color: #8b9aa8; background: #fff; font-size: 17px; }
+.phone-input-row > button:hover { color: #a33e45; background: #fff6f6; }
+.inheritor-section-title { margin-top: 20px; padding-top: 17px; border-top: 1px solid #edf1f5; }
+.full-label { display: block; }
+.nic-upload-section { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-top: 19px; padding: 13px; border: 1px dashed #cbd9e6; border-radius: 4px; background: #f8fbfe; }
+.nic-upload-section .form-section-title { margin-bottom: 4px; }
+.nic-upload-section p { margin: 0; color: #8999a8; font-size: 10px; }
+.file-picker { max-width: 220px; overflow: hidden; padding: 8px 11px !important; border: 1px solid #d0dfec; border-radius: 4px; color: #2d6c9f !important; background: #fff; font-size: 10px !important; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.file-picker input { display: none; }
+.form-error { margin: 12px 0 0; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; padding-top: 15px; border-top: 1px solid #edf1f5; }
+.cancel-button { min-height: 40px; padding: 0 14px; border: 1px solid #d8e1e9; border-radius: 4px; color: #526c83; background: #fff; font-size: 11px; }
+.cancel-button:hover:not(:disabled) { background: #f6f9fb; }
+.cancel-button:disabled { opacity: .6; }
+@media (max-width: 680px) { .investors-page { min-height: calc(100vh - 28px); padding: 19px 16px; } .investors-header { align-items: flex-start; } .investors-header h1 { font-size: 25px; } .investors-subtitle { max-width: 200px; font-size: 11px; line-height: 1.5; } .investors-header .add-investor-button { min-height: 37px; padding-inline: 10px; font-size: 10px; } .investor-details { grid-template-columns: 1fr; gap: 12px; } .investor-card { padding: 15px; } .modal-backdrop { padding: 10px; place-items: end center; } .investor-modal { max-height: 94vh; border-radius: 8px 8px 0 0; } .investor-form { padding: 17px 17px 20px; } .modal-header { padding-inline: 17px; } }
+@media (max-width: 420px) { .investors-header { gap: 8px; } .investors-header .add-investor-button { gap: 5px; padding-inline: 8px; } .investor-card-top { gap: 9px; } .nic-button { padding: 6px 7px; font-size: 9px; } .form-two-col { grid-template-columns: 1fr; gap: 12px; } .nic-upload-section { align-items: flex-start; flex-direction: column; } }

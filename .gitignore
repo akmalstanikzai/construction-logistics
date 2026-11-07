@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local credentials
+.env
+cloudflare/r2-worker/.dev.vars
