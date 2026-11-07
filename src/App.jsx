@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import './App.css'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 

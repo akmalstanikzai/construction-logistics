@@ -25,7 +25,7 @@ function LoginPage() {
       </section>
       <section className="form-panel">
         <div className="form-wrap">
-          <div className="mobile-brand brand"><BrandMark /><span>FIELD<span className="brand-light">LINE</span></span></div>
+          <div className="mobile-brand brand"><BrandMark /><span>ASMA AFGHAN</span></div>
           <div className="form-heading">
             <p className="form-kicker">YOUR OPERATIONS, IN ONE PLACE</p>
             <h2>Welcome back</h2>
@@ -50,7 +50,7 @@ function LoginPage() {
           </form>
           <p className="secure-note"><svg viewBox="0 0 18 18" aria-hidden="true"><rect x="3.5" y="7.5" width="11" height="8" rx="1.5" /><path d="M6 7.5V5a3 3 0 0 1 6 0v2.5" /></svg> Secure access for authorized team members</p>
         </div>
-        <footer className="form-footer"><span>© 2026 Fieldline Group</span><span>BUILT FOR THE LONG HAUL</span></footer>
+        <footer className="form-footer"><span>© 2026 Asma Afghan</span><span>BUILT FOR THE LONG HAUL</span></footer>
       </section>
     </main>
   )

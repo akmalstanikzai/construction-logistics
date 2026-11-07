@@ -5,7 +5,7 @@ function Sidebar({ onSignOut }) {
     <aside className="dashboard-sidebar">
       <div className="dashboard-brand brand">
         <BrandMark />
-        <span>FIELD<span className="brand-light">LINE</span></span>
+        <span>ASMA AFGHAN</span>
       </div>
       <nav className="sidebar-nav" aria-label="Main navigation">
         <a className="sidebar-link active" href="#investors" aria-current="page">
