@@ -1,6 +1,6 @@
-# Private investor NIC documents on Cloudflare R2
+# Private investor NID documents on Cloudflare R2
 
-The browser never receives R2 credentials. This Worker checks the caller's Supabase Auth token, checks investor access through Supabase RLS, and reads/writes NIC PDFs through a private R2 bucket binding.
+The browser never receives R2 credentials. This Worker checks the caller's Supabase Auth token, checks investor access through Supabase RLS, and reads/writes NID PDFs through a private R2 bucket binding.
 
 The current deployment is `https://asma-afghan-investor-documents.asma-afghan-0b6224dd.workers.dev`. Its R2 bucket is `asma-afghan-investor-nics`, and the app's local `.env.local` points to this Worker.
 
@@ -10,7 +10,7 @@ Apply the SQL migrations in filename order with the Supabase CLI. If using the S
 
 1. `supabase/migrations/202611070001_investors.sql` creates the investor tables and the `create_investor` transaction function.
 2. `supabase/migrations/202611070002_investor_staff_access.sql` previously required staff approval.
-3. `supabase/migrations/202611070003_authenticated_investor_access.sql` supersedes that restriction and allows every authenticated user to view and add investors and attach NIC PDFs.
+3. `supabase/migrations/202611070003_authenticated_investor_access.sql` supersedes that restriction and allows every authenticated user to view and add investors and attach NID PDFs.
 4. `supabase/migrations/202611070004_fix_create_investor_contacts.sql` fixes the `create_investor` function used by the add investor form.
 
 The staff list from migration 002 is no longer checked after migration 003. Users only need to sign in through Supabase Auth. If the app should be invite-only, turn off **Allow new users to sign up** in Supabase Auth settings and invite users through **Authentication → Users**.
@@ -50,4 +50,4 @@ For a hosted frontend, add the same variable to its build environment, then rebu
 
 ## 5. CORS and file restrictions
 
-Browser requests go to the Worker, which returns CORS headers only for its configured `APP_ORIGINS`. R2 is accessed server-side through the binding, so the bucket does not need browser CORS rules. The Worker accepts only authenticated requests, PDF content with a `%PDF-` signature, and files up to 10 MB. It serves downloads as attachments and disables caching. If a document upload fails after an investor record is saved, use **Attach NIC** on that record to retry without creating a duplicate investor.
+Browser requests go to the Worker, which returns CORS headers only for its configured `APP_ORIGINS`. R2 is accessed server-side through the binding, so the bucket does not need browser CORS rules. The Worker accepts only authenticated requests, PDF content with a `%PDF-` signature, and files up to 10 MB. It serves downloads as attachments and disables caching. If a document upload fails after an investor record is saved, use **Attach NID** on that record to retry without creating a duplicate investor.

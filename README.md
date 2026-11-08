@@ -1,6 +1,6 @@
 # Asma Afghan
 
-React/Vite investor register with Supabase Auth and database records. NIC PDFs are kept in a private Cloudflare R2 bucket and served through an authenticated Worker.
+React/Vite investor register with Supabase Auth and database records. NID PDFs are kept in a private Cloudflare R2 bucket and served through an authenticated Worker.
 
 ## Local setup
 
@@ -31,4 +31,4 @@ VITE_R2_WORKER_URL=https://asma-afghan-investor-documents.asma-afghan-0b6224dd.w
 
 Use the Supabase project URL and publishable key from your own project. Vite embeds these values at build time, so redeploy after changing them. Never put a Supabase secret/service-role key in a `VITE_` variable.
 
-After Vercel gives you a production URL, add its exact origin (for example, `https://your-project.vercel.app`) to `APP_ORIGINS` in `cloudflare/r2-worker/wrangler.toml`, then redeploy the Worker with `npx wrangler deploy --config cloudflare/r2-worker/wrangler.toml`. Include any custom domain origin you use. Without this step, investor records work but NIC PDF requests from production are blocked by the Worker.
+After Vercel gives you a production URL, add its exact origin (for example, `https://your-project.vercel.app`) to `APP_ORIGINS` in `cloudflare/r2-worker/wrangler.toml`, then redeploy the Worker with `npx wrangler deploy --config cloudflare/r2-worker/wrangler.toml`. Include any custom domain origin you use. Without this step, investor records work but NID PDF requests from production are blocked by the Worker.

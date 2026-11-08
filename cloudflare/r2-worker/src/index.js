@@ -64,7 +64,7 @@ export default {
       if (!investor) return json({ error: 'Investor not found' }, 404, origin)
 
       if (request.method === 'POST') {
-        if (investor.nic_r2_key) return json({ error: 'This investor already has a NIC PDF' }, 409, origin)
+        if (investor.nic_r2_key) return json({ error: 'This investor already has a NID PDF' }, 409, origin)
         const declaredLength = Number(request.headers.get('Content-Length') || 0)
         if (declaredLength > MAX_PDF_SIZE + 32 * 1024) return json({ error: 'PDF must be 10 MB or smaller' }, 413, origin)
         const form = await request.formData()
@@ -76,7 +76,7 @@ export default {
 
         const key = `investors/${investorId}/${crypto.randomUUID()}.pdf`
         const storedObject = await env.NIC_DOCUMENTS.put(key, file, {
-          httpMetadata: { contentType: 'application/pdf', contentDisposition: 'inline; filename="investor-nic.pdf"' },
+          httpMetadata: { contentType: 'application/pdf', contentDisposition: 'inline; filename="investor-nid.pdf"' },
           customMetadata: { investorId, uploadedBy: user.id },
         })
         if (!storedObject) return json({ error: 'R2 did not save the PDF' }, 502, origin)
@@ -94,13 +94,13 @@ export default {
         return json({ key }, 201, origin)
       }
 
-      if (!investor.nic_r2_key) return json({ error: 'No NIC PDF is attached' }, 404, origin)
+      if (!investor.nic_r2_key) return json({ error: 'No NID PDF is attached' }, 404, origin)
       const object = await env.NIC_DOCUMENTS.get(investor.nic_r2_key)
-      if (!object) return json({ error: 'NIC PDF was not found in R2' }, 404, origin)
+      if (!object) return json({ error: 'NID PDF was not found in R2' }, 404, origin)
       return new Response(object.body, {
         headers: corsHeaders(origin, {
           'Content-Type': 'application/pdf',
-          'Content-Disposition': 'attachment; filename="investor-nic.pdf"',
+          'Content-Disposition': 'attachment; filename="investor-nid.pdf"',
           'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff',
         }),
