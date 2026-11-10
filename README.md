@@ -1,6 +1,6 @@
 # Asma Afghan
 
-React/Vite investor register with Supabase Auth and database records. NID PDFs are kept in a private Cloudflare R2 bucket and served through an authenticated Worker.
+React/Vite investor register with Supabase Auth and database records. NID PDF or images and images are kept in a private Cloudflare R2 bucket and served through an authenticated Worker.
 
 ## Local setup
 
@@ -31,4 +31,8 @@ VITE_R2_WORKER_URL=https://asma-afghan-investor-documents.asma-afghan-0b6224dd.w
 
 Use the Supabase project URL and publishable key from your own project. Vite embeds these values at build time, so redeploy after changing them. Never put a Supabase secret/service-role key in a `VITE_` variable.
 
-After Vercel gives you a production URL, add its exact origin (for example, `https://your-project.vercel.app`) to `APP_ORIGINS` in `cloudflare/r2-worker/wrangler.toml`, then redeploy the Worker with `npx wrangler deploy --config cloudflare/r2-worker/wrangler.toml`. Include any custom domain origin you use. Without this step, investor records work but NID PDF requests from production are blocked by the Worker.
+After Vercel gives you a production URL, add its exact origin (for example, `https://your-project.vercel.app`) to `APP_ORIGINS` in `cloudflare/r2-worker/wrangler.toml`, then redeploy the Worker with `npx wrangler deploy --config cloudflare/r2-worker/wrangler.toml`. Include any custom domain origin you use. Without this step, investor records work but NID PDF or image requests from production are blocked by the Worker.
+
+## Projects
+
+Apply `supabase/migrations/202611080003_projects.sql` to create the projects and project document tables. The Projects page records name, code number, organization, location, price, dates, status, and note. Status can be updated after creation. Project attachments use the existing private R2 Worker and bucket; deploy the updated `cloudflare/r2-worker/src/index.js` before uploading or downloading project documents. Each attachment is limited to 10 MB. Supported formats are PDF, images, Word, Excel, and plain text.

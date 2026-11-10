@@ -33,6 +33,11 @@ function formatAmount(amount) {
   return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+function validDocument(file) {
+  if (!file || file.size === 0 || file.size > 10 * 1024 * 1024) return false
+  return file.type === 'application/pdf' || file.type.startsWith('image/')
+}
+
 function InvestorsPage() {
   const [investors, setInvestors] = useState([])
   const [expandedInvestorId, setExpandedInvestorId] = useState(null)
@@ -139,9 +144,11 @@ function InvestorsPage() {
 
   async function uploadNicFile(investorId, file) {
     if (!workerUrl) throw new Error('The R2 Worker URL is not configured.')
-    if (file.size > 10 * 1024 * 1024) throw new Error('PDF must be 10 MB or smaller.')
-    const signature = new TextDecoder().decode(await file.slice(0, 5).arrayBuffer())
-    if (signature !== '%PDF-') throw new Error('Choose a valid PDF file.')
+    if (!validDocument(file)) throw new Error('Choose a PDF or image of 10 MB or less.')
+    if (file.type === 'application/pdf') {
+      const signature = new TextDecoder().decode(await file.slice(0, 5).arrayBuffer())
+      if (signature !== '%PDF-') throw new Error('Choose a valid PDF file.')
+    }
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) throw new Error('Your session expired. Sign in again.')
 
@@ -158,7 +165,7 @@ function InvestorsPage() {
       throw new Error('Could not reach the R2 Worker. Check its URL and allowed origins.')
     }
     const result = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(result.error || `NID PDF upload failed (HTTP ${response.status}).`)
+    if (!response.ok) throw new Error(result.error || `NID document upload failed (HTTP ${response.status}).`)
   }
 
   async function handleSubmit(event) {
@@ -167,16 +174,23 @@ function InvestorsPage() {
     setFormError('')
     setNotice('')
     if (!workerUrl && form.nicFile) {
-      setFormError('Set VITE_R2_WORKER_URL to enable NID PDF uploads.')
+      setFormError('Set VITE_R2_WORKER_URL to enable NID document uploads.')
       setSaving(false)
       return
     }
     if (form.nicFile) {
-      const signature = new TextDecoder().decode(await form.nicFile.slice(0, 5).arrayBuffer())
-      if (signature !== '%PDF-') {
-        setFormError('Choose a valid PDF file.')
+      if (!validDocument(form.nicFile)) {
+        setFormError('Choose a PDF or image of 10 MB or less.')
         setSaving(false)
         return
+      }
+      if (form.nicFile.type === 'application/pdf') {
+        const signature = new TextDecoder().decode(await form.nicFile.slice(0, 5).arrayBuffer())
+        if (signature !== '%PDF-') {
+          setFormError('Choose a valid PDF file.')
+          setSaving(false)
+          return
+        }
       }
     }
 
@@ -216,7 +230,7 @@ function InvestorsPage() {
     await loadInvestors()
     setSaving(false)
     if (uploadError) {
-      setLoadError(`Investor and investment saved without the NID PDF: ${uploadError.message} Use Attach NID to try again.`)
+      setLoadError(`Investor and investment saved without the NID document: ${uploadError.message} Use Attach NID to try again.`)
     } else {
       setNotice('Investor and initial investment added. Your PDF receipt is downloading.')
     }
@@ -237,9 +251,9 @@ function InvestorsPage() {
     try {
       await uploadNicFile(investor.id, file)
       await loadInvestors()
-      setNotice('NID PDF attached successfully.')
+      setNotice('NID document attached successfully.')
     } catch (error) {
-      setLoadError(`NID PDF upload failed: ${error.message}`)
+      setLoadError(`NID document upload failed: ${error.message}`)
     } finally {
       input.value = ''
       setUploadingId('')
@@ -248,7 +262,7 @@ function InvestorsPage() {
 
   async function downloadNic(investor) {
     if (!workerUrl) {
-      setLoadError('Set VITE_R2_WORKER_URL to enable NID PDF downloads.')
+      setLoadError('Set VITE_R2_WORKER_URL to enable NID document downloads.')
       return
     }
     setDownloadingId(investor.id)
@@ -261,12 +275,14 @@ function InvestorsPage() {
       })
       if (!response.ok) {
         const result = await response.json()
-        throw new Error(result.error || 'Could not download the NID PDF')
+        throw new Error(result.error || 'Could not download the NID document')
       }
       const blobUrl = URL.createObjectURL(await response.blob())
       const link = document.createElement('a')
       link.href = blobUrl
-      link.download = `${investor.first_name}-${investor.last_name}-NID.pdf`
+      const type = response.headers.get('Content-Type') || 'application/octet-stream'
+      const extension = type === 'application/pdf' ? 'pdf' : type === 'image/jpeg' ? 'jpg' : type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : type === 'image/gif' ? 'gif' : type === 'image/svg+xml' ? 'svg' : type === 'image/heic' ? 'heic' : type === 'image/heif' ? 'heif' : type === 'image/avif' ? 'avif' : type === 'image/bmp' ? 'bmp' : type === 'image/tiff' ? 'tiff' : 'image'
+      link.download = `${investor.first_name}-${investor.last_name}-NID.${extension}`
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -368,10 +384,10 @@ function InvestorsPage() {
                   <div className="investor-name"><h2>{investor.first_name} {investor.last_name}</h2><span>Investor</span></div>
                   {investor.nic_r2_key ? <button className="nic-button" onClick={() => downloadNic(investor)} disabled={downloadingId === investor.id}>
                     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5v10m0 0 3.5-3.5M10 12.5 6.5 9M3 14v3h14v-3" /></svg>
-                    {downloadingId === investor.id ? 'Loading…' : 'NID PDF'}
+                    {downloadingId === investor.id ? 'Loading…' : 'Download NID'}
                   </button> : <label className="nic-button nic-upload-button">
                     {uploadingId === investor.id ? 'Uploading…' : 'Attach NID'}
-                    <input type="file" accept="application/pdf,.pdf" disabled={uploadingId === investor.id} onChange={(event) => attachNic(investor, event)} />
+                    <input type="file" accept="application/pdf,image/*,.pdf" disabled={uploadingId === investor.id} onChange={(event) => attachNic(investor, event)} />
                   </label>}
                 </div>
                 <div className="investor-summary"><div><span>Current balance</span><strong>{formatAmount(totals.added - totals.withdrawn)}</strong></div><div><span>Added</span><strong>{formatAmount(totals.added)}</strong></div><div><span>Withdrawn</span><strong>{formatAmount(totals.withdrawn)}</strong></div><button type="button" className="investor-expand" aria-expanded={expanded} onClick={() => setExpandedInvestorId(expanded ? null : investor.id)}>{expanded ? 'Hide details' : 'View details'} <span aria-hidden="true">{expanded ? '⌃' : '⌄'}</span></button></div>
@@ -421,11 +437,11 @@ function InvestorsPage() {
             <div className="form-two-col"><label>Amount of investment<input type="number" min="0.01" step="0.01" required value={form.initialAmount} onChange={(event) => updateField('initialAmount', event.target.value)} /></label><label>Date of investment<input type="date" required value={form.initialDate} onChange={(event) => updateField('initialDate', event.target.value)} /></label></div>
             <label className="full-label investment-note-label">Investment note<textarea rows="3" value={form.initialNote} onChange={(event) => updateField('initialNote', event.target.value)} /></label>
             <div className="nic-upload-section">
-              <div><span className="form-section-title">NID document</span><p>Attach a PDF copy of the NID. Maximum 10 MB.</p></div>
-              <label className="file-picker">{form.nicFile ? <span>{form.nicFile.name}</span> : <span>Choose PDF</span>}<input type="file" accept="application/pdf,.pdf" onChange={(event) => {
+              <div><span className="form-section-title">NID document</span><p>Attach a PDF or image of the NID. Maximum 10 MB.</p></div>
+              <label className="file-picker">{form.nicFile ? <span>{form.nicFile.name}</span> : <span>Choose PDF or image</span>}<input type="file" accept="application/pdf,image/*,.pdf" onChange={(event) => {
                 const file = event.target.files?.[0] ?? null
                 if (file && file.size > 10 * 1024 * 1024) {
-                  setFormError('PDF must be 10 MB or smaller.')
+                  setFormError('File must be 10 MB or smaller.')
                   event.target.value = ''
                   return
                 }

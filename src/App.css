@@ -184,3 +184,36 @@ form label { display: block; margin-bottom: 9px; font-size: 12px; color: #334a62
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 600px) { .investor-overview { grid-template-columns: 1fr 1fr; } .investor-list-heading { flex-wrap: wrap; } .investor-search { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .investor-card, .investor-expand { transition: none; } .investor-expanded { animation: none; } }
+.project-card-main { display: flex; align-items: center; gap: 13px; }
+.project-icon { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; border-radius: 8px; color: #276c9f; background: #e9f3fa; font-size: 24px; }
+.project-title { min-width: 0; flex: 1; }
+.project-title h2 { margin: 0; color: #1d3c5a; font: 700 15px 'Manrope', sans-serif; }
+.project-title p { margin: 5px 0 0; color: #8295a7; font-size: 11px; overflow-wrap: anywhere; }
+.project-status { padding: 6px 10px; border-radius: 30px; background: #e8f2fa; color: #286da1; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.status-submitted { background: #fff2dc; color: #95671e; }
+.status-completed { background: #e2f5e9; color: #27724d; }
+.project-card-summary { display: grid; grid-template-columns: 1fr 1fr 1.4fr auto; gap: 14px; align-items: center; margin-top: 17px; padding-top: 15px; border-top: 1px solid #edf1f5; }
+.project-card-summary span, .project-note span { display: block; color: #8295a7; font-size: 10px; }
+.project-card-summary strong { display: block; margin-top: 5px; color: #294966; font-size: 12px; overflow-wrap: anywhere; }
+.project-expanded { margin-top: 16px; padding-top: 15px; border-top: 1px solid #edf1f5; animation: investor-reveal .2s ease-out; }
+.project-note p { margin: 7px 0 17px; color: #354f67; font-size: 12px; white-space: pre-wrap; }
+.project-doc-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.project-doc-heading h3 { margin: 0; color: #294966; font-size: 13px; }
+.project-doc-heading p { margin: 4px 0 0; color: #8295a7; font-size: 10px; }
+.project-attach { display: inline-flex !important; align-items: center; cursor: pointer; }
+.project-attach input { display: none; }
+.project-doc-list { display: grid; gap: 7px; margin-top: 12px; }
+.project-doc-list button { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #e3eaf1; border-radius: 6px; background: #fff; color: #315b7b; text-align: left; font-size: 11px; overflow-wrap: anywhere; cursor: pointer; }
+.project-doc-list button:hover { background: #f5faff; }
+.project-doc-list button small { margin-left: auto; color: #3574a1; white-space: nowrap; }
+.project-modal { width: min(100%, 690px); }
+.project-form-row { margin-top: 15px; }
+.investor-form select { display: block; width: 100%; height: 39px; margin-top: 7px; padding: 0 11px; border: 1px solid #d9e3ec; border-radius: 4px; color: #213e59; background: #fff; font-size: 12px; }
+.project-file-picker { display: block; margin-top: 18px !important; padding: 13px; border: 1px dashed #cbd9e6; border-radius: 5px; background: #f8fbfe; cursor: pointer; }
+.project-file-picker input { display: none; }
+.project-file-picker span { display: block; margin-top: 5px; color: #708da3; font-size: 10px; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .project-card-summary { grid-template-columns: 1fr 1fr; } .project-card-summary .investor-expand { grid-column: 1 / -1; } }
+@media (max-width: 420px) { .project-status { font-size: 9px; padding: 5px 7px; } .project-card-main { gap: 8px; } }
+.project-status-control { margin-bottom: 16px; }
+.project-status-control label { color: #526d82; font-size: 11px; font-weight: 600; }
+.project-status-control select { display: block; min-width: 180px; margin-top: 6px; padding: 7px 9px; border: 1px solid #d9e3ec; border-radius: 5px; color: #294966; background: #fff; font-size: 11px; }
