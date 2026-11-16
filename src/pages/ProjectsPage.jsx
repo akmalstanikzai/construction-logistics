@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabase'
+import DocumentPreview from '../components/DocumentPreview'
 
 const emptyProject = { name: '', code_number: '', organization: '', location: '', total_price: '', project_base: '', start_date: '', end_date: '', status: 'in_progress', note: '', files: [] }
 const statusLabels = { in_progress: 'In progress', submitted: 'Submitted', completed: 'Completed' }
@@ -27,6 +28,8 @@ function ProjectsPage() {
   const [saving, setSaving] = useState(false)
   const [uploadingId, setUploadingId] = useState(null)
   const [updatingId, setUpdatingId] = useState(null)
+  const [preview, setPreview] = useState(null)
+  const closePreview = useCallback(() => setPreview(null), [])
 
   const loadProjects = useCallback(async () => {
     const { data: rows, error: projectError } = await supabase.from('projects')
@@ -113,7 +116,7 @@ function ProjectsPage() {
     setUpdatingId(null)
   }
 
-  async function downloadDocument(project, document) {
+  async function previewDocument(project, document) {
     try {
       if (!workerUrl) throw new Error('The document Worker URL is not configured.')
       const response = await fetch(`${workerUrl}/projects/${project.id}/documents/${document.id}`, { headers: { Authorization: `Bearer ${await token()}` } })
@@ -121,14 +124,8 @@ function ProjectsPage() {
         const result = await response.json().catch(() => ({}))
         throw new Error(result.error || 'Could not download document.')
       }
-      const url = URL.createObjectURL(await response.blob())
-      const link = window.document.createElement('a')
-      link.href = url
-      link.download = document.file_name
-      window.document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+      const blob = await response.blob()
+      setPreview({ url: URL.createObjectURL(blob), type: blob.type || document.content_type || '', name: document.file_name })
     } catch (downloadError) { setError(downloadError.message) }
   }
 
@@ -144,9 +141,10 @@ function ProjectsPage() {
       return <article className="investor-card project-card" key={project.id}>
         <div className="project-card-main"><div className="project-icon" aria-hidden="true">▤</div><div className="project-title"><h2>{project.name}</h2><p>{project.code_number} · {project.organization}</p></div><span className={`project-status status-${project.status}`}>{statusLabels[project.status]}</span></div>
         <div className="project-card-summary"><div><span>Location</span><strong>{project.location}</strong></div><div><span>Total price</span><strong>{formatPrice(project.total_price)}</strong></div><div><span>Dates</span><strong>{project.start_date} – {project.end_date}</strong></div><button type="button" className="investor-expand" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : project.id)}>{expanded ? 'Hide details' : 'View details'} <span aria-hidden="true">{expanded ? '⌃' : '⌄'}</span></button></div>
-        {expanded && <div className="project-expanded"><div className="project-status-control"><label>Project status<select value={project.status} disabled={updatingId === project.id} onChange={(event) => updateStatus(project, event.target.value)}><option value="in_progress">In progress</option><option value="submitted">Submitted</option><option value="completed">Completed</option></select></label></div><div className="project-note"><span>Project base</span><p>{project.project_base || '—'}</p></div><div className="project-note"><span>Note</span><p>{project.note || '—'}</p></div><div className="project-doc-heading"><div><h3>Documents</h3><p>{project.documents.length} attached</p></div><label className="cancel-button project-attach">{uploadingId === project.id ? 'Uploading…' : '+ Attach documents'}<input type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.txt" disabled={uploadingId === project.id} onChange={(event) => attachDocuments(project, event)} /></label></div>{project.documents.length ? <div className="project-doc-list">{project.documents.map((document) => <button key={document.id} type="button" onClick={() => downloadDocument(project, document)}><span>▤</span>{document.file_name}<small>Download</small></button>)}</div> : <p className="investment-empty">No documents attached yet.</p>}</div>}
+        {expanded && <div className="project-expanded"><div className="project-status-control"><label>Project status<select value={project.status} disabled={updatingId === project.id} onChange={(event) => updateStatus(project, event.target.value)}><option value="in_progress">In progress</option><option value="submitted">Submitted</option><option value="completed">Completed</option></select></label></div><div className="project-note"><span>Project base</span><p>{project.project_base || '—'}</p></div><div className="project-note"><span>Note</span><p>{project.note || '—'}</p></div><div className="project-doc-heading"><div><h3>Documents</h3><p>{project.documents.length} attached</p></div><label className="cancel-button project-attach">{uploadingId === project.id ? 'Uploading…' : '+ Attach documents'}<input type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.txt" disabled={uploadingId === project.id} onChange={(event) => attachDocuments(project, event)} /></label></div>{project.documents.length ? <div className="project-doc-list">{project.documents.map((document) => <button key={document.id} type="button" onClick={() => previewDocument(project, document)}><span>▤</span>{document.file_name}<small>View</small></button>)}</div> : <p className="investment-empty">No documents attached yet.</p>}</div>}
       </article>
     })}</div>}
+    <DocumentPreview preview={preview} onClose={closePreview} />
     {modalOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setModalOpen(false) }}><section className="investor-modal project-modal" role="dialog" aria-modal="true" aria-labelledby="project-modal-title"><header className="modal-header"><div><p className="investors-eyebrow">PROJECT REGISTER</p><h2 id="project-modal-title">Add project</h2></div><button className="modal-close" disabled={saving} onClick={() => setModalOpen(false)} aria-label="Close">×</button></header><form className="investor-form" onSubmit={saveProject}>
       <div className="form-two-col"><label>Project name<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} autoFocus /></label><label>Code number<input required value={form.code_number} onChange={(event) => setForm({ ...form, code_number: event.target.value })} /></label></div>
       <div className="form-two-col project-form-row"><label>Respective organization<input required value={form.organization} onChange={(event) => setForm({ ...form, organization: event.target.value })} /></label><label>Location<input required value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label></div>

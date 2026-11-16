@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { downloadInvestorReport, downloadReceipt } from '../receipt'
+import DocumentPreview from '../components/DocumentPreview'
 
 const emptyForm = {
   firstName: '',
@@ -50,6 +51,8 @@ function InvestorsPage() {
   const [formError, setFormError] = useState('')
   const [notice, setNotice] = useState('')
   const [downloadingId, setDownloadingId] = useState('')
+  const [preview, setPreview] = useState(null)
+  const closePreview = useCallback(() => setPreview(null), [])
   const [uploadingId, setUploadingId] = useState('')
   const [investmentInvestor, setInvestmentInvestor] = useState(null)
   const [investmentForm, setInvestmentForm] = useState(() => ({ amount: '', date: new Date().toLocaleDateString('en-CA'), note: '' }))
@@ -260,9 +263,9 @@ function InvestorsPage() {
     }
   }
 
-  async function downloadNic(investor) {
+  async function previewNic(investor) {
     if (!workerUrl) {
-      setLoadError('Set VITE_R2_WORKER_URL to enable NID document downloads.')
+      setLoadError('Set VITE_R2_WORKER_URL to enable NID document previews.')
       return
     }
     setDownloadingId(investor.id)
@@ -277,16 +280,10 @@ function InvestorsPage() {
         const result = await response.json()
         throw new Error(result.error || 'Could not download the NID document')
       }
-      const blobUrl = URL.createObjectURL(await response.blob())
-      const link = document.createElement('a')
-      link.href = blobUrl
-      const type = response.headers.get('Content-Type') || 'application/octet-stream'
-      const extension = type === 'application/pdf' ? 'pdf' : type === 'image/jpeg' ? 'jpg' : type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : type === 'image/gif' ? 'gif' : type === 'image/svg+xml' ? 'svg' : type === 'image/heic' ? 'heic' : type === 'image/heif' ? 'heif' : type === 'image/avif' ? 'avif' : type === 'image/bmp' ? 'bmp' : type === 'image/tiff' ? 'tiff' : 'image'
-      link.download = `${investor.first_name}-${investor.last_name}-NID.${extension}`
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
+      const blob = await response.blob()
+      const type = blob.type || response.headers.get('Content-Type') || 'application/octet-stream'
+      const extension = type === 'application/pdf' ? 'pdf' : type === 'image/jpeg' ? 'jpg' : type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : type === 'image/gif' ? 'gif' : 'image'
+      setPreview({ url: URL.createObjectURL(blob), type, name: `${investor.first_name}-${investor.last_name}-NID.${extension}` })
     } catch (error) {
       setLoadError(error.message)
     } finally {
@@ -382,9 +379,9 @@ function InvestorsPage() {
                 <div className="investor-card-top">
                   <div className="investor-avatar" aria-hidden="true">{investor.first_name[0]}{investor.last_name[0]}</div>
                   <div className="investor-name"><h2>{investor.first_name} {investor.last_name}</h2><span>Investor</span></div>
-                  {investor.nic_r2_key ? <button className="nic-button" onClick={() => downloadNic(investor)} disabled={downloadingId === investor.id}>
+                  {investor.nic_r2_key ? <button className="nic-button" onClick={() => previewNic(investor)} disabled={downloadingId === investor.id}>
                     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5v10m0 0 3.5-3.5M10 12.5 6.5 9M3 14v3h14v-3" /></svg>
-                    {downloadingId === investor.id ? 'Loading…' : 'Download NID'}
+                    {downloadingId === investor.id ? 'Loading…' : 'View NID'}
                   </button> : <label className="nic-button nic-upload-button">
                     {uploadingId === investor.id ? 'Uploading…' : 'Attach NID'}
                     <input type="file" accept="application/pdf,image/*,.pdf" disabled={uploadingId === investor.id} onChange={(event) => attachNic(investor, event)} />
@@ -406,6 +403,7 @@ function InvestorsPage() {
         </div>
       )}
 
+      <DocumentPreview preview={preview} onClose={closePreview} />
       {investmentInvestor && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !investmentSaving) setInvestmentInvestor(null) }}><section className="investor-modal" role="dialog" aria-modal="true" aria-labelledby="investment-modal-title"><header className="modal-header"><div><p className="investors-eyebrow">INVESTMENT</p><h2 id="investment-modal-title">{investmentKind === 'withdrawal' ? 'Take investment from' : 'Add investment for'} {investmentInvestor.first_name} {investmentInvestor.last_name}</h2></div><button className="modal-close" onClick={() => setInvestmentInvestor(null)} disabled={investmentSaving} aria-label="Close">×</button></header><form className="investor-form" onSubmit={saveInvestment}><div className="form-two-col"><label>{investmentKind === 'withdrawal' ? 'Amount to take' : 'Amount of investment'}<input type="number" min="0.01" step="0.01" required value={investmentForm.amount} onChange={(event) => setInvestmentForm((current) => ({ ...current, amount: event.target.value }))} autoFocus /></label><label>{investmentKind === 'withdrawal' ? 'Date taken' : 'Date of investment'}<input type="date" required value={investmentForm.date} onChange={(event) => setInvestmentForm((current) => ({ ...current, date: event.target.value }))} /></label></div><label className="full-label investment-note-label">Note<textarea value={investmentForm.note} onChange={(event) => setInvestmentForm((current) => ({ ...current, note: event.target.value }))} rows="4" /></label>{investmentError && <p className="error-message form-error" role="alert">{investmentError}</p>}<footer className="modal-actions"><button type="button" className="cancel-button" onClick={() => setInvestmentInvestor(null)} disabled={investmentSaving}>Cancel</button><button type="submit" className="add-investor-button" disabled={investmentSaving}>{investmentSaving ? 'Saving…' : 'Save and download PDF receipt'}</button></footer></form></section></div>}
 
       {modalOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeModal() }}>

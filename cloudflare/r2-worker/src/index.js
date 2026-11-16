@@ -63,6 +63,12 @@ async function projectDocumentRequest(request, env, origin, projectId, documentI
     if (declaredLength > MAX_DOCUMENT_SIZE + 32 * 1024) return json({ error: 'File must be 10 MB or smaller' }, 413, origin)
     const form = await request.formData()
     const file = form.get('file')
+    const expenseId = form.get('expense_id')
+    if (expenseId && (typeof expenseId !== 'string' || !UUID_RE.test(expenseId))) return json({ error: 'Invalid expense' }, 400, origin)
+    if (expenseId) {
+      const expenseResponse = await supabaseRequest(`project_expenses?id=eq.${expenseId}&project_id=eq.${projectId}&select=id&limit=1`, env, authorization)
+      if (!expenseResponse.ok || !(await expenseResponse.json()).length) return json({ error: 'Expense not found' }, 404, origin)
+    }
     if (!(file instanceof File) || !file.size || file.size > MAX_DOCUMENT_SIZE) return json({ error: 'Choose a file of 10 MB or less' }, 400, origin)
     const contentType = file.type.toLowerCase()
     if (!PROJECT_FILE_TYPES.has(contentType) && !/^image\/[a-z0-9.+-]+$/.test(contentType)) return json({ error: 'Unsupported document type' }, 415, origin)
@@ -73,7 +79,7 @@ async function projectDocumentRequest(request, env, origin, projectId, documentI
     if (!saved) return json({ error: 'Document storage failed' }, 502, origin)
     const insert = await supabaseRequest('project_documents?select=id', env, authorization, {
       method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ project_id: projectId, file_name: fileName, content_type: contentType, r2_key: key }),
+      body: JSON.stringify({ project_id: projectId, expense_id: expenseId || null, file_name: fileName, content_type: contentType, r2_key: key }),
     })
     if (!insert.ok) {
       await env.NIC_DOCUMENTS.delete(key)
