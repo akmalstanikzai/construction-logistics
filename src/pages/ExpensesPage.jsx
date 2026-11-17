@@ -3,7 +3,7 @@ import { supabase } from '../supabase'
 import DocumentPreview from '../components/DocumentPreview'
 
 const types = [
-  ['security', 'Security'],
+  ['security', 'Guarantee'],
   ['money_transfer_commission', 'Money transfer commission'],
   ['goods_purchases', "Good's purchases"],
   ['transportation_customs', 'Transportation and customs'],
@@ -27,6 +27,8 @@ function ExpensesPage() {
   const [settings, setSettings] = useState([])
   const [expenses, setExpenses] = useState([])
   const [documents, setDocuments] = useState([])
+  const [financialSettings, setFinancialSettings] = useState([])
+  const [taxRate, setTaxRate] = useState('0')
   const [projectId, setProjectId] = useState('')
   const [activeType, setActiveType] = useState('')
   const [selectedType, setSelectedType] = useState('')
@@ -39,19 +41,21 @@ function ExpensesPage() {
   const closePreview = useCallback(() => setPreview(null), [])
 
   const load = useCallback(async () => {
-    const [projectResult, settingResult, expenseResult, documentResult] = await Promise.all([
-      supabase.from('projects').select('id, name, code_number').order('name'),
+    const [projectResult, settingResult, expenseResult, documentResult, financialResult] = await Promise.all([
+      supabase.from('projects').select('id, name, code_number, total_price, project_base').order('name'),
       supabase.from('project_expense_types').select('project_id, expense_type, enabled'),
       supabase.from('project_expenses').select('id, project_id, expense_type, expense_date, amount, note, created_at').order('expense_date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('project_documents').select('id, project_id, expense_id, file_name, content_type').not('expense_id', 'is', null),
+      supabase.from('project_financial_settings').select('project_id, tax_percentage, charity_percentage, investor_percentage'),
     ])
-    const loadError = [projectResult, settingResult, expenseResult, documentResult].find((result) => result.error)?.error
+    const loadError = [projectResult, settingResult, expenseResult, documentResult, financialResult].find((result) => result.error)?.error
     if (loadError) setError(loadError.message)
     else {
       setProjects(projectResult.data)
       setSettings(settingResult.data)
       setExpenses(expenseResult.data)
       setDocuments(documentResult.data)
+      setFinancialSettings(financialResult.data)
       setProjectId((current) => current || projectResult.data[0]?.id || '')
     }
     setLoading(false)
@@ -61,6 +65,23 @@ function ExpensesPage() {
     // oxlint-disable-next-line react/set-state-in-effect -- Load expense records on mount.
     load()
   }, [load])
+
+  useEffect(() => {
+    setTaxRate(String(financialSettings.find((item) => item.project_id === projectId)?.tax_percentage ?? 0))
+  }, [projectId, financialSettings])
+
+  async function saveTax(event) {
+    event.preventDefault()
+    const rate = Number(taxRate)
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) { setError('Enter a tax percentage from 0 to 100.'); return }
+    setBusy(true); setError(''); setNotice('')
+    const existing = financialSettings.find((item) => item.project_id === projectId)
+    const row = { project_id: projectId, tax_percentage: rate, charity_percentage: existing?.charity_percentage ?? 2.5, investor_percentage: existing?.investor_percentage ?? 20 }
+    const { error: saveError } = await supabase.from('project_financial_settings').upsert(row)
+    if (saveError) setError(saveError.message)
+    else { setFinancialSettings((current) => [...current.filter((item) => item.project_id !== projectId), row]); setNotice('Tax percentage saved for this project.') }
+    setBusy(false)
+  }
 
   async function toggle(type, enabled) {
     setBusy(true)
@@ -127,28 +148,34 @@ function ExpensesPage() {
   }
 
   const project = projects.find((item) => item.id === projectId)
+  const isMurabeha = project?.project_base === 'Murabeha'
   const projectExpenses = expenses.filter((item) => item.project_id === projectId)
-  const total = projectExpenses.reduce((sum, item) => sum + Number(item.amount), 0)
-  const enabledTypes = types.filter(([key]) => settings.some((item) => item.project_id === projectId && item.expense_type === key && item.enabled))
-  const currentType = selectedType && types.some(([key]) => key === selectedType) ? selectedType : enabledTypes[0]?.[0] || types[0][0]
+  const recordedTotal = projectExpenses.reduce((sum, item) => sum + Number(item.amount), 0)
+  const taxEnabled = isMurabeha && settings.some((item) => item.project_id === projectId && item.expense_type === 'tax' && item.enabled)
+  const taxAmount = taxEnabled ? Math.round(Number(project?.total_price || 0) * Number(taxRate || 0)) / 100 : 0
+  const total = recordedTotal + taxAmount
+  const availableTypes = isMurabeha ? types : types.filter(([key]) => key !== 'tax')
+  const enabledTypes = availableTypes.filter(([key]) => settings.some((item) => item.project_id === projectId && item.expense_type === key && item.enabled))
+  const currentType = selectedType && availableTypes.some(([key]) => key === selectedType) ? selectedType : enabledTypes[0]?.[0] || availableTypes[0][0]
   const selectedExpenses = projectExpenses.filter((item) => item.expense_type === currentType)
   const selectedEnabled = enabledTypes.some(([key]) => key === currentType)
 
   return <section className="investors-page expenses-page" aria-label="Project expenses">
-    <header className="investors-header"><div><p className="investors-eyebrow">ASMA AFGHAN</p><h1>Expenses</h1><p className="investors-subtitle">Manage expense types and records for each project.</p></div></header>
+    <header className="investors-header"><div><p className="investors-eyebrow">ASMA AFGHAN</p><h1>Expenses</h1><p className="investors-subtitle">Manage expense types and records for each project. Murabeha tax is calculated by percentage.</p></div></header>
     {notice && <div className="investors-notice" role="status">{notice}</div>}
     {error && <div className="investors-alert" role="alert">{error}</div>}
     {loading ? <div className="investors-state"><span className="loader" /></div> : !projects.length ? <div className="investors-empty"><h2>No projects yet</h2><p>Add a project before recording expenses.</p></div> : <>
-      <div className="expense-toolbar"><label>Choose a project<select value={projectId} onChange={(event) => { setProjectId(event.target.value); setActiveType(''); setSelectedType(''); setNotice(''); setError('') }}>{projects.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.code_number}</option>)}</select></label><div className="expense-total"><span>Total recorded expenses</span><strong>{money(total)}</strong><small>{projectExpenses.length} {projectExpenses.length === 1 ? 'entry' : 'entries'}</small></div></div>
-      <div className="expense-intro"><div><p className="expense-step">STEP 1 · CHOOSE A TYPE</p><h2>Expenses for {project?.name}</h2><p>Switch on the types this project needs. Choose a type to view its entries.</p></div><span className="expense-enabled-count">{enabledTypes.length} of {types.length} enabled</span></div>
-      <div className="expense-workspace"><div className="expense-type-list">{types.map(([key, label]) => {
+      <div className="expense-toolbar"><label>Choose a project<select value={projectId} onChange={(event) => { setProjectId(event.target.value); setActiveType(''); setSelectedType(''); setNotice(''); setError('') }}>{projects.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.code_number}</option>)}</select></label><div className="expense-total"><span>Total recorded expenses</span><strong>{money(total)}</strong><small>{projectExpenses.length} recorded {projectExpenses.length === 1 ? 'entry' : 'entries'}{taxEnabled ? ' + tax' : ''}</small></div></div>
+      <div className="expense-intro"><div><p className="expense-step">STEP 1 · CHOOSE A TYPE</p><h2>Expenses for {project?.name}</h2><p>Switch on the types this project needs. Choose a type to view its entries.</p></div><span className="expense-enabled-count">{enabledTypes.length} of {availableTypes.length} enabled</span></div>
+      <div className="expense-workspace"><div className="expense-type-list">{availableTypes.map(([key, label]) => {
         const enabled = enabledTypes.some(([type]) => type === key)
         const items = projectExpenses.filter((item) => item.expense_type === key)
         return <div className={`expense-type-row ${currentType === key ? 'selected' : ''}`} key={key}>
-          <button type="button" className="expense-type-choice" aria-current={currentType === key ? 'true' : undefined} onClick={() => setSelectedType(key)}><span className="expense-type-name">{label}</span><span className="expense-type-meta">{key === 'tax' ? 'Coming later' : `${items.length} ${items.length === 1 ? 'entry' : 'entries'} · ${money(items.reduce((sum, item) => sum + Number(item.amount), 0))}`}</span></button>
+          <button type="button" className="expense-type-choice" aria-current={currentType === key ? 'true' : undefined} onClick={() => setSelectedType(key)}><span className="expense-type-name">{label}</span><span className="expense-type-meta">{key === 'tax' ? `${taxRate}% · ${money(taxAmount)}` : `${items.length} ${items.length === 1 ? 'entry' : 'entries'} · ${money(items.reduce((sum, item) => sum + Number(item.amount), 0))}`}</span></button>
           <label className="expense-switch"><input type="checkbox" checked={enabled} disabled={busy} aria-label={`${label} expenses for ${project?.name}`} onChange={(event) => toggle(key, event.target.checked)} /><span className="expense-switch-track" aria-hidden="true" /><span className="expense-switch-state">{enabled ? 'On' : 'Off'}</span></label>
         </div>
-      })}</div><div className="expense-detail"><div className="expense-detail-header"><div><p className="expense-step">STEP 2 · REVIEW AND ADD</p><h2>{labels[currentType]}</h2><p>{currentType === 'tax' ? 'Tax details will be added later.' : selectedEnabled ? `${selectedExpenses.length} ${selectedExpenses.length === 1 ? 'entry' : 'entries'} recorded for this project` : 'This type is off for this project. Turn it on to add expenses.'}</p></div>{selectedEnabled && currentType !== 'tax' && <button className="add-investor-button" onClick={() => { setActiveType(currentType); setForm(newExpense()); setError('') }}>+ Add expense</button>}</div>
+      })}</div><div className="expense-detail"><div className="expense-detail-header"><div><p className="expense-step">STEP 2 · REVIEW AND ADD</p><h2>{labels[currentType]}</h2><p>{currentType === 'tax' ? 'Calculated from this project’s total price and included in expenses when Tax is on.' : selectedEnabled ? `${selectedExpenses.length} ${selectedExpenses.length === 1 ? 'entry' : 'entries'} recorded for this project` : 'This type is off for this project. Turn it on to add expenses.'}</p></div>{selectedEnabled && currentType !== 'tax' && <button className="add-investor-button" onClick={() => { setActiveType(currentType); setForm(newExpense()); setError('') }}>+ Add expense</button>}</div>
+        {currentType === 'tax' && <form className="tax-form" onSubmit={saveTax}><label>Tax percentage<div className="tax-input"><input type="number" min="0" max="100" step="0.01" required value={taxRate} onChange={(event) => setTaxRate(event.target.value)} /><span>%</span></div></label><div className="tax-calculation"><span>{money(project?.total_price || 0)} × {taxRate || 0}%</span><strong>{money(taxAmount)}</strong><small>{taxEnabled ? 'Included in total expenses' : 'Turn on Tax to include this amount'}</small></div><button className="add-investor-button" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save tax rate'}</button></form>}
         {currentType !== 'tax' && (selectedExpenses.length ? <div className="expense-records">{selectedExpenses.map((item) => {
           const attachment = documents.find((document) => document.expense_id === item.id)
           return <div className="expense-record" key={item.id}><div><strong>{money(item.amount)}</strong><span>{item.expense_date}</span>{item.note && <p>{item.note}</p>}</div>{attachment && <button type="button" onClick={() => previewDocument(attachment)}>View {attachment.file_name}</button>}</div>

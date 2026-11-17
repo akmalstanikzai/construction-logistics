@@ -21,6 +21,10 @@ function Sidebar({ onSignOut, page, onNavigate }) {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM8 9h8M8 13h8M8 17h5" /></svg>
           <span>Expenses</span>
         </a>
+        <a className={`sidebar-link ${page === 'profit' ? 'active' : ''}`} href="#profit" aria-label="Profit and loss" aria-current={page === 'profit' ? 'page' : undefined} onClick={(event) => { event.preventDefault(); onNavigate('profit') }}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 15l4-4 3 2 5-7M18 6h-4m4 0v4" /></svg>
+          <span>Profit & loss</span>
+        </a>
       </nav>
       <button className="sidebar-sign-out" onClick={onSignOut} aria-label="Sign out">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3m9-8h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7" /></svg>
