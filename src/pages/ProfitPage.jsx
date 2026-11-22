@@ -11,8 +11,13 @@ const expenseCategories = [
 ]
 
 const defaults = { tax_percentage: 0, charity_percentage: 2.5, investor_percentage: 20 }
+const muzarebahDefaults = { ...defaults, investor_percentage: 15, company_charity_percentage: 2.5, company_remuneration_percentage: 15 }
 const money = (value) => Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const round = (value) => Math.round((value + Number.EPSILON) * 100) / 100
+
+function CalculationLabel({ formula, children }) {
+  return <span className="profit-calculation-label"><small>{formula}</small>{children}</span>
+}
 
 function ProfitPage() {
   const [projects, setProjects] = useState([])
@@ -30,7 +35,7 @@ function ProfitPage() {
     const results = await Promise.all([
       supabase.from('projects').select('id, name, code_number, total_price, project_base').order('name'),
       supabase.from('project_expenses').select('project_id, expense_type, amount'),
-      supabase.from('project_financial_settings').select('project_id, tax_percentage, charity_percentage, investor_percentage'),
+      supabase.from('project_financial_settings').select('project_id, tax_percentage, charity_percentage, investor_percentage, company_charity_percentage, company_remuneration_percentage'),
       supabase.from('project_expense_types').select('project_id, expense_type, enabled').eq('expense_type', 'tax'),
     ])
     const failed = results.find((result) => result.error)
@@ -47,11 +52,12 @@ function ProfitPage() {
   useEffect(() => { load() }, [load])
   useEffect(() => {
     const saved = settings.find((item) => item.project_id === projectId)
-    setRates(saved ? { tax_percentage: saved.tax_percentage, charity_percentage: saved.charity_percentage, investor_percentage: saved.investor_percentage } : defaults)
-  }, [projectId, settings])
+    setRates(saved ? { tax_percentage: saved.tax_percentage, charity_percentage: saved.charity_percentage, investor_percentage: saved.investor_percentage, company_charity_percentage: saved.company_charity_percentage, company_remuneration_percentage: saved.company_remuneration_percentage } : projects.find((item) => item.id === projectId)?.project_base === 'Muzarebah' ? muzarebahDefaults : defaults)
+  }, [projectId, settings, projects])
 
   const project = projects.find((item) => item.id === projectId)
   const isMurabeha = project?.project_base === 'Murabeha'
+  const isMuzarebah = project?.project_base === 'Muzarebah'
   const revenue = round(Number(project?.total_price || 0))
   const entries = expenses.filter((item) => item.project_id === projectId)
   const categoryTotals = expenseCategories.map(([key, label]) => {
@@ -62,14 +68,22 @@ function ProfitPage() {
   const operatingEntries = entries.filter((item) => item.expense_type !== 'security')
   const recorded = round(operatingEntries.reduce((sum, item) => sum + Number(item.amount), 0))
   const taxOn = taxEnabled.some((item) => item.project_id === projectId && item.enabled)
-  const tax = taxOn ? round(revenue * Number(rates.tax_percentage || 0) / 100) : 0
+  const tax = isMurabeha && taxOn ? round(revenue * Number(rates.tax_percentage || 0) / 100) : 0
   const totalExpenses = round(recorded + tax)
   const result = round(revenue - totalExpenses)
   const profit = Math.max(result, 0)
-  const charity = round(profit * Number(rates.charity_percentage || 0) / 100)
-  const afterCharity = round(profit - charity)
+  const guaranteeProfit = isMuzarebah && totalExpenses + guarantee > 0 ? round(profit * guarantee / (totalExpenses + guarantee)) : 0
+  const investmentProfit = isMuzarebah ? round((profit - guaranteeProfit) / 2) : 0
+  const investorProfit = isMuzarebah ? round(guaranteeProfit + investmentProfit) : profit
+  const charity = round(investorProfit * Number(rates.charity_percentage || 0) / 100)
+  const afterCharity = round(investorProfit - charity)
   const remuneration = round(afterCharity * Number(rates.investor_percentage || 0) / 100)
   const remaining = round(afterCharity - remuneration)
+  const companyProfit = investmentProfit
+  const companyCharity = round(companyProfit * Number(rates.company_charity_percentage || 0) / 100)
+  const companyAfterCharity = round(companyProfit - companyCharity)
+  const companyRemuneration = round(companyAfterCharity * Number(rates.company_remuneration_percentage || 0) / 100)
+  const companyRemaining = round(companyAfterCharity - companyRemuneration)
 
   async function save(event) {
     event.preventDefault()
@@ -91,9 +105,9 @@ function ProfitPage() {
     {error && <div className="investors-alert" role="alert">{error}</div>}{notice && <div className="investors-notice" role="status">{notice}</div>}
     {loading ? <div className="investors-state"><span className="loader" /></div> : !projects.length ? <div className="investors-empty"><h2>No projects yet</h2><p>Add a project to see its profit and loss.</p></div> : <>
       <div className="profit-picker"><label>Project<select value={projectId} onChange={(event) => { setProjectId(event.target.value); setNotice(''); setError('') }}>{projects.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.code_number}</option>)}</select></label><div className="profit-project-type"><span>Project type</span><strong>{project?.project_base || 'Not specified'}</strong></div></div>
-      {!isMurabeha ? <div className="profit-pending" role="status"><p className="expense-step">{project?.project_base || 'PROJECT TYPE'}</p><h2>Calculations for this project type are coming later</h2><p>The current profit, tax, and allocation formulas apply to Murabeha projects. Expense records for this project remain available on the Expenses page.</p></div> : <><div className="profit-summary"><div><span>Project total</span><strong>{money(revenue)}</strong></div><div><span>Total expenses</span><strong>{money(totalExpenses)}</strong></div><div className={result < 0 ? 'profit-negative' : 'profit-positive'}><span>{result < 0 ? 'Loss' : 'Profit'}</span><strong>{money(Math.abs(result))}</strong></div></div>
-      <div className="profit-grid"><div className="profit-panel"><p className="expense-step">PROJECT BREAKDOWN</p><h2>How the result is calculated</h2><div className="profit-line"><span>Project total price</span><strong>{money(revenue)}</strong></div><div className="profit-category-heading">Expense categories</div>{categoryTotals.filter((category) => category.key !== 'security').map((category) => <div className="profit-line profit-category" key={category.key}><span>{category.label} <small>({category.count})</small></span><strong>− {money(category.amount)}</strong></div>)}<div className="profit-line profit-subtotal"><span>Recorded expenses <small>({operatingEntries.length} entries)</small></span><strong>− {money(recorded)}</strong></div><div className="profit-line profit-guarantee"><span>Guarantee <small>({entries.length - operatingEntries.length} entries · recoverable, excluded)</small></span><strong>{money(guarantee)}</strong></div><div className="profit-line"><span>Tax <small>({taxOn ? `${rates.tax_percentage || 0}% of project total` : 'off in Expenses'})</small></span><strong>− {money(tax)}</strong></div><div className="profit-line profit-result"><span>{result < 0 ? 'Net loss' : 'Net profit'}</span><strong>{money(result)}</strong></div></div>
-      <form className="profit-panel" onSubmit={save}><p className="expense-step">PROJECT SETTINGS</p><h2>Profit allocation</h2><p className="profit-help">Charity is deducted from positive profit first; remuneration is then calculated from the amount left.</p><div className="profit-line"><span>Profit available for allocation</span><strong>{money(profit)}</strong></div><div className="profit-rate"><label htmlFor="profit-charity">Charity</label><div><input id="profit-charity" type="number" min="0" max="100" step="0.01" value={rates.charity_percentage} onChange={(event) => setRates({ ...rates, charity_percentage: event.target.value })} /><span>%</span></div><strong>− {money(charity)}</strong></div><div className="profit-line"><span>Amount after charity</span><strong>{money(afterCharity)}</strong></div><div className="profit-rate"><label htmlFor="profit-remuneration">Remuneration</label><div><input id="profit-remuneration" type="number" min="0" max="100" step="0.01" value={rates.investor_percentage} onChange={(event) => setRates({ ...rates, investor_percentage: event.target.value })} /><span>%</span></div><strong>− {money(remuneration)}</strong></div><div className="profit-line profit-result"><span>Amount after remuneration</span><strong>{money(remaining)}</strong></div><button type="submit" className="add-investor-button" disabled={saving}>{saving ? 'Saving…' : 'Save percentages'}</button></form></div>
+      {!isMurabeha && !isMuzarebah ? <div className="profit-pending" role="status"><p className="expense-step">{project?.project_base || 'PROJECT TYPE'}</p><h2>Calculations for this project type are coming later</h2><p>Expense records for this project remain available on the Expenses page.</p></div> : <><div className="profit-summary"><div><span>Project total</span><strong>{money(revenue)}</strong></div><div><span>Total expenses</span><strong>{money(totalExpenses)}</strong></div><div className={result < 0 ? 'profit-negative' : 'profit-positive'}><span>{result < 0 ? 'Loss' : 'Profit'}</span><strong>{money(Math.abs(result))}</strong></div></div>
+      <div className="profit-grid"><div className="profit-panel"><p className="expense-step">PROJECT BREAKDOWN</p><h2>How the result is calculated</h2><div className="profit-line"><span>Project total price</span><strong>{money(revenue)}</strong></div><div className="profit-category-heading">Expense categories</div>{categoryTotals.filter((category) => category.key !== 'security').map((category) => <div className="profit-line profit-category" key={category.key}><span>{category.label} <small>({category.count})</small></span><strong>− {money(category.amount)}</strong></div>)}<div className="profit-line profit-subtotal"><span>Recorded expenses <small>({operatingEntries.length} entries)</small></span><strong>− {money(recorded)}</strong></div><div className="profit-line profit-guarantee"><span>Guarantee <small>({entries.length - operatingEntries.length} entries · recoverable, excluded)</small></span><strong>{money(guarantee)}</strong></div>{isMurabeha && <div className="profit-line"><span>Tax <small>({taxOn ? `${rates.tax_percentage || 0}% of project total` : 'off in Expenses'})</small></span><strong>− {money(tax)}</strong></div>}<div className="profit-line profit-result"><CalculationLabel formula="Project total − expenses (excluding guarantee)">{result < 0 ? 'Net loss' : 'Net profit'}</CalculationLabel><strong>{money(result)}</strong></div></div>
+      <form className="profit-panel" onSubmit={save}><p className="expense-step">PROJECT SETTINGS</p><h2>{isMuzarebah ? "Investor’s profit allocation" : "Profit allocation"}</h2><p className="profit-help">Charity is deducted from {isMuzarebah ? 'the investor’s profit' : 'positive profit'} first; remuneration is then calculated from the amount left.</p>{isMuzarebah && <><div className="profit-line"><CalculationLabel formula="Profit ÷ (expenses + guarantee) × guarantee">Guarantee profit</CalculationLabel><strong>{money(guaranteeProfit)}</strong></div><div className="profit-line"><CalculationLabel formula="(Profit − guarantee profit) ÷ 2">Investment profit</CalculationLabel><strong>{money(investmentProfit)}</strong></div><div className="profit-line profit-subtotal"><CalculationLabel formula="Guarantee profit + investment profit">Investor’s profit</CalculationLabel><strong>{money(investorProfit)}</strong></div></>}<div className="profit-line"><span>Profit available for allocation</span><strong>{money(investorProfit)}</strong></div><div className="profit-rate"><label htmlFor="profit-charity"><CalculationLabel formula={`${isMuzarebah ? 'Investor’s profit' : 'Profit'} × charity %`}>Charity</CalculationLabel></label><div><input id="profit-charity" type="number" min="0" max="100" step="0.01" value={rates.charity_percentage} onChange={(event) => setRates({ ...rates, charity_percentage: event.target.value })} /><span>%</span></div><strong>− {money(charity)}</strong></div><div className="profit-line"><CalculationLabel formula={`${isMuzarebah ? 'Investor’s profit' : 'Profit'} − charity`}>Amount after charity</CalculationLabel><strong>{money(afterCharity)}</strong></div><div className="profit-rate"><label htmlFor="profit-remuneration"><CalculationLabel formula="Amount after charity × remuneration %">Remuneration</CalculationLabel></label><div><input id="profit-remuneration" type="number" min="0" max="100" step="0.01" value={rates.investor_percentage} onChange={(event) => setRates({ ...rates, investor_percentage: event.target.value })} /><span>%</span></div><strong>− {money(remuneration)}</strong></div><div className="profit-line profit-result"><CalculationLabel formula="Amount after charity − remuneration">Amount after remuneration</CalculationLabel><strong>{money(remaining)}</strong></div><button type="submit" className="add-investor-button" disabled={saving}>{saving ? 'Saving…' : 'Save percentages'}</button></form>{isMuzarebah && <form className="profit-panel" onSubmit={save}><p className="expense-step">PROJECT SETTINGS</p><h2>Company’s profit allocation</h2><div className="profit-line profit-subtotal"><CalculationLabel formula="(Profit − guarantee profit) ÷ 2">Company’s profit</CalculationLabel><strong>{money(companyProfit)}</strong></div><div className="profit-rate"><label htmlFor="company-charity"><CalculationLabel formula="Company’s profit × charity %">Charity</CalculationLabel></label><div><input id="company-charity" type="number" min="0" max="100" step="0.01" value={rates.company_charity_percentage} onChange={(event) => setRates({ ...rates, company_charity_percentage: event.target.value })} /><span>%</span></div><strong>− {money(companyCharity)}</strong></div><div className="profit-line"><CalculationLabel formula="Company’s profit − charity">Amount after charity</CalculationLabel><strong>{money(companyAfterCharity)}</strong></div><div className="profit-rate"><label htmlFor="company-remuneration"><CalculationLabel formula="Amount after charity × remuneration %">Remuneration</CalculationLabel></label><div><input id="company-remuneration" type="number" min="0" max="100" step="0.01" value={rates.company_remuneration_percentage} onChange={(event) => setRates({ ...rates, company_remuneration_percentage: event.target.value })} /><span>%</span></div><strong>− {money(companyRemuneration)}</strong></div><div className="profit-line profit-result"><CalculationLabel formula="Amount after charity − remuneration">Amount after remuneration</CalculationLabel><strong>{money(companyRemaining)}</strong></div><button type="submit" className="add-investor-button" disabled={saving}>{saving ? 'Saving…' : 'Save percentages'}</button></form>}</div>
       {result < 0 && <p className="profit-loss-note">This project has a loss, so charity and remuneration are 0.</p>}</>}
     </>}
   </section>
