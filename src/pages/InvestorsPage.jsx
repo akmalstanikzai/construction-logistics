@@ -46,6 +46,7 @@ function InvestorsPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
+  const [editingInvestorId, setEditingInvestorId] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
@@ -55,6 +56,7 @@ function InvestorsPage() {
   const closePreview = useCallback(() => setPreview(null), [])
   const [uploadingId, setUploadingId] = useState('')
   const [investmentInvestor, setInvestmentInvestor] = useState(null)
+  const [editingInvestmentId, setEditingInvestmentId] = useState(null)
   const [investmentForm, setInvestmentForm] = useState(() => ({ amount: '', date: '', note: '' }))
   const [investmentKind, setInvestmentKind] = useState('deposit')
   const [investmentSaving, setInvestmentSaving] = useState(false)
@@ -203,6 +205,22 @@ function InvestorsPage() {
       setSaving(false)
       return
     }
+    if (editingInvestorId) {
+      const { error: updateError } = await supabase.rpc('update_investor_details', {
+        p_investor_id: editingInvestorId, p_first_name: form.firstName.trim(), p_last_name: form.lastName.trim(),
+        p_contact_numbers: form.contactNumbers.map((phone) => phone.trim()).filter(Boolean),
+        p_inheritor_name: form.inheritorName.trim(),
+        p_inheritor_contact_numbers: form.inheritorContactNumbers.map((phone) => phone.trim()).filter(Boolean),
+      })
+      if (updateError) { setFormError(updateError.message); setSaving(false); return }
+      let uploadError = null
+      if (form.nicFile) try { await uploadNicFile(editingInvestorId, form.nicFile) } catch (error) { uploadError = error }
+      setEditingInvestorId(null); setForm(emptyForm); setModalOpen(false); setSaving(false)
+      await loadInvestors()
+      if (uploadError) setLoadError(`Investor updated, but NID upload failed: ${uploadError.message}`)
+      else setNotice('Investor updated.')
+      return
+    }
     const { data: created, error: createError } = await supabase.rpc('create_investor_with_investment', {
       p_first_name: form.firstName.trim(),
       p_last_name: form.lastName.trim(),
@@ -291,6 +309,50 @@ function InvestorsPage() {
     }
   }
 
+
+  function editInvestor(investor) {
+    setEditingInvestorId(investor.id)
+    setForm({ ...emptyForm, firstName: investor.first_name, lastName: investor.last_name,
+      contactNumbers: phoneList(investor.contacts, 'investor').length ? phoneList(investor.contacts, 'investor') : [''],
+      inheritorName: investor.inheritor_name,
+      inheritorContactNumbers: phoneList(investor.contacts, 'inheritor').length ? phoneList(investor.contacts, 'inheritor') : [''] })
+    setFormError(''); setModalOpen(true)
+  }
+
+  async function deleteNic(investor) {
+    if (!workerUrl) throw new Error('The R2 Worker URL is not configured.')
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) throw new Error('Your session expired. Sign in again.')
+    const response = await fetch(`${workerUrl}/investors/${investor.id}/nic`, { method: 'DELETE', headers: { Authorization: `Bearer ${session.access_token}` } })
+    if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.error || 'Could not delete NID document.') }
+  }
+
+  async function deleteInvestor(investor) {
+    if (!window.confirm(`Delete ${investor.first_name} ${investor.last_name} and all investment history?`)) return
+    setLoadError(''); setNotice('')
+    try {
+      if (investor.nic_r2_key) await deleteNic(investor)
+      const { error } = await supabase.from('investors').delete().eq('id', investor.id)
+      if (error) throw error
+      setExpandedInvestorId(null); await loadInvestors(); setNotice('Investor deleted.')
+    } catch (error) { setLoadError(error.message) }
+  }
+
+  function editInvestment(investor, item) {
+    setInvestmentInvestor(investor); setEditingInvestmentId(item.id); setInvestmentKind(item.kind)
+    setInvestmentForm({ amount: String(item.amount), date: item.investment_date || '', note: item.note || '' })
+    setInvestmentError('')
+  }
+
+  async function deleteInvestment(investor, item) {
+    if (!window.confirm(`Delete this ${item.kind === 'withdrawal' ? 'withdrawal' : 'investment'}?`)) return
+    const balanceAfter = investor.investments.reduce((sum, entry) => entry.id === item.id ? sum : sum + (entry.kind === 'withdrawal' ? -1 : 1) * Number(entry.amount), 0)
+    if (balanceAfter < 0) { setLoadError('Deleting this investment would make the balance negative.'); return }
+    const { error } = await supabase.from('investments').delete().eq('id', item.id)
+    if (error) setLoadError(error.message)
+    else { await loadInvestors(); setNotice('Investment record deleted.') }
+  }
+
   async function saveInvestment(event) {
     event.preventDefault()
     const amount = investmentForm.amount === '' ? null : Number(investmentForm.amount)
@@ -298,9 +360,15 @@ function InvestorsPage() {
       setInvestmentError(investmentKind === 'withdrawal' ? 'Enter an amount greater than zero and a date to withdraw.' : 'Enter an amount greater than zero when provided.')
       return
     }
+    if (editingInvestmentId) {
+      const balanceAfter = investmentInvestor.investments.reduce((sum, entry) => sum + (entry.kind === 'withdrawal' ? -1 : 1) * (entry.id === editingInvestmentId ? amount : Number(entry.amount)), 0)
+      if (balanceAfter < 0) { setInvestmentError('This change would make the investment balance negative.'); return }
+    }
     setInvestmentSaving(true)
     setInvestmentError('')
-    const { data, error } = investmentKind === 'withdrawal'
+    const { data, error } = editingInvestmentId
+      ? await supabase.from('investments').update({ amount, investment_date: investmentForm.date, note: investmentForm.note.trim() }).eq('id', editingInvestmentId).select('id, investor_id, amount, investment_date, note, kind, created_at').single()
+      : investmentKind === 'withdrawal'
       ? await supabase.rpc('withdraw_investment', { p_investor_id: investmentInvestor.id, p_amount: amount, p_date: investmentForm.date, p_note: investmentForm.note.trim() })
       : await supabase.from('investments').insert({
         investor_id: investmentInvestor.id,
@@ -314,11 +382,13 @@ function InvestorsPage() {
       return
     }
     const investor = investmentInvestor
+    const wasEditing = Boolean(editingInvestmentId)
+    setEditingInvestmentId(null)
     setInvestmentInvestor(null)
     setInvestmentSaving(false)
     await loadInvestors()
-    setNotice(`${investmentKind === 'withdrawal' ? 'Withdrawal' : 'Investment'} recorded${amount === null ? '.' : '. Your PDF receipt is downloading.'}`)
-    try { if (amount !== null) await downloadReceipt(investor, data) }
+    setNotice(wasEditing ? 'Investment record updated.' : `${investmentKind === 'withdrawal' ? 'Withdrawal' : 'Investment'} recorded${amount === null ? '.' : '. Your PDF receipt is downloading.'}`)
+    try { if (!wasEditing && amount !== null) await downloadReceipt(investor, data) }
     catch (receiptError) { setLoadError(`Investment saved, but receipt download failed: ${receiptError.message}`) }
   }
 
@@ -347,7 +417,7 @@ function InvestorsPage() {
           <h1>Investors</h1>
           <p className="investors-subtitle">Investor records and inheritance contacts.</p>
         </div>
-        <button className="add-investor-button" onClick={() => { setModalOpen(true); setNotice('') }}>
+        <button className="add-investor-button" onClick={() => { setEditingInvestorId(null); setForm(emptyForm); setModalOpen(true); setNotice('') }}>
           <span aria-hidden="true">+</span> Add investor
         </button>
       </header>
@@ -388,14 +458,14 @@ function InvestorsPage() {
                   </label>}
                 </div>
                 <div className="investor-summary"><div><span>Current balance</span><strong>{formatAmount(totals.added - totals.withdrawn)}</strong></div><div><span>Added</span><strong>{formatAmount(totals.added)}</strong></div><div><span>Withdrawn</span><strong>{formatAmount(totals.withdrawn)}</strong></div><button type="button" className="investor-expand" aria-expanded={expanded} onClick={() => setExpandedInvestorId(expanded ? null : investor.id)}>{expanded ? 'Hide details' : 'View details'} <span aria-hidden="true">{expanded ? '⌃' : '⌄'}</span></button></div>
-                {expanded && <div className="investor-expanded"><div className="investor-details">
+                {expanded && <div className="investor-expanded"><div className="record-actions"><button type="button" onClick={() => editInvestor(investor)}>Edit investor</button><button type="button" className="record-delete" onClick={() => deleteInvestor(investor)}>Delete investor</button>{investor.nic_r2_key && <button type="button" className="record-delete" onClick={async () => { if (!window.confirm("Delete this NID document?")) return; try { await deleteNic(investor); await loadInvestors(); setNotice("NID document deleted.") } catch (error) { setLoadError(error.message) } }}>Delete NID</button>}</div><div className="investor-details">
                   <div><span className="detail-label">Contact numbers</span><p>{displayPhones(investorPhones)}</p></div>
                   <div><span className="detail-label">Inheritor</span><p>{investor.inheritor_name}</p></div>
                   <div><span className="detail-label">Inheritor numbers</span><p>{displayPhones(inheritorPhones)}</p></div>
                 </div>
                 <div className="investment-section">
-                  <div className="investment-heading"><div><h3>Investment history</h3><p>{investor.investments.length} {investor.investments.length === 1 ? 'transaction' : 'transactions'}</p></div><div className="investment-buttons"><button className="cancel-button" onClick={() => getReport(investor)}>Download report PDF</button><button className="add-investor-button" onClick={() => { setInvestmentKind('deposit'); setInvestmentInvestor(investor); setInvestmentError(''); setInvestmentForm({ amount: '', date: '', note: '' }) }}>+ Add investment</button><button className="cancel-button" onClick={() => { setInvestmentKind('withdrawal'); setInvestmentInvestor(investor); setInvestmentError(''); setInvestmentForm({ amount: '', date: '', note: '' }) }} disabled={totals.added - totals.withdrawn <= 0}>Take investment</button></div></div>
-                  {investor.investments.length === 0 ? <p className="investment-empty">No investments recorded yet.</p> : <div className="investment-list">{investor.investments.map((item) => <div className="investment-row" key={item.id}><div><strong>{item.kind === 'withdrawal' ? 'Taken: ' : 'Added: '}{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong><span>{item.investment_date}</span>{item.note && <p>{item.note}</p>}</div><div className="receipt-actions"><button onClick={() => getReceipt(investor, item, 'pdf')}>PDF receipt</button><button onClick={() => getReceipt(investor, item, 'jpg')}>JPG receipt</button></div></div>)}</div>}
+                  <div className="investment-heading"><div><h3>Investment history</h3><p>{investor.investments.length} {investor.investments.length === 1 ? 'transaction' : 'transactions'}</p></div><div className="investment-buttons"><button className="cancel-button" onClick={() => getReport(investor)}>Download report PDF</button><button className="add-investor-button" onClick={() => { setEditingInvestmentId(null); setInvestmentKind('deposit'); setInvestmentInvestor(investor); setInvestmentError(''); setInvestmentForm({ amount: '', date: '', note: '' }) }}>+ Add investment</button><button className="cancel-button" onClick={() => { setEditingInvestmentId(null); setInvestmentKind('withdrawal'); setInvestmentInvestor(investor); setInvestmentError(''); setInvestmentForm({ amount: '', date: '', note: '' }) }} disabled={totals.added - totals.withdrawn <= 0}>Take investment</button></div></div>
+                  {investor.investments.length === 0 ? <p className="investment-empty">No investments recorded yet.</p> : <div className="investment-list">{investor.investments.map((item) => <div className="investment-row" key={item.id}><div><strong>{item.kind === 'withdrawal' ? 'Taken: ' : 'Added: '}{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong><span>{item.investment_date}</span>{item.note && <p>{item.note}</p>}</div><div className="receipt-actions"><button onClick={() => getReceipt(investor, item, 'pdf')}>PDF receipt</button><button onClick={() => getReceipt(investor, item, 'jpg')}>JPG receipt</button><button onClick={() => editInvestment(investor, item)}>Edit</button><button className="record-delete" onClick={() => deleteInvestment(investor, item)}>Delete</button></div></div>)}</div>}
                 </div></div>}
               </article>
             )
@@ -404,11 +474,11 @@ function InvestorsPage() {
       )}
 
       <DocumentPreview preview={preview} onClose={closePreview} />
-      {investmentInvestor && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !investmentSaving) setInvestmentInvestor(null) }}><section className="investor-modal" role="dialog" aria-modal="true" aria-labelledby="investment-modal-title"><header className="modal-header"><div><p className="investors-eyebrow">INVESTMENT</p><h2 id="investment-modal-title">{investmentKind === 'withdrawal' ? 'Take investment from' : 'Add investment for'} {investmentInvestor.first_name} {investmentInvestor.last_name}</h2></div><button className="modal-close" onClick={() => setInvestmentInvestor(null)} disabled={investmentSaving} aria-label="Close">×</button></header><form className="investor-form" onSubmit={saveInvestment}><div className="form-two-col"><label>{investmentKind === 'withdrawal' ? 'Amount to take' : 'Amount of investment'}<input type="number" min="0.01" step="0.01" value={investmentForm.amount} onChange={(event) => setInvestmentForm((current) => ({ ...current, amount: event.target.value }))} autoFocus /></label><label>{investmentKind === 'withdrawal' ? 'Date taken' : 'Date of investment'}<input type="date" value={investmentForm.date} onChange={(event) => setInvestmentForm((current) => ({ ...current, date: event.target.value }))} /></label></div><label className="full-label investment-note-label">Note<textarea value={investmentForm.note} onChange={(event) => setInvestmentForm((current) => ({ ...current, note: event.target.value }))} rows="4" /></label>{investmentError && <p className="error-message form-error" role="alert">{investmentError}</p>}<footer className="modal-actions"><button type="button" className="cancel-button" onClick={() => setInvestmentInvestor(null)} disabled={investmentSaving}>Cancel</button><button type="submit" className="add-investor-button" disabled={investmentSaving}>{investmentSaving ? 'Saving…' : 'Save and download PDF receipt'}</button></footer></form></section></div>}
+      {investmentInvestor && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !investmentSaving) setInvestmentInvestor(null) }}><section className="investor-modal" role="dialog" aria-modal="true" aria-labelledby="investment-modal-title"><header className="modal-header"><div><p className="investors-eyebrow">INVESTMENT</p><h2 id="investment-modal-title">{editingInvestmentId ? 'Edit investment for' : investmentKind === 'withdrawal' ? 'Take investment from' : 'Add investment for'} {investmentInvestor.first_name} {investmentInvestor.last_name}</h2></div><button className="modal-close" onClick={() => setInvestmentInvestor(null)} disabled={investmentSaving} aria-label="Close">×</button></header><form className="investor-form" onSubmit={saveInvestment}><div className="form-two-col"><label>{investmentKind === 'withdrawal' ? 'Amount to take' : 'Amount of investment'}<input type="number" min="0.01" step="0.01" value={investmentForm.amount} onChange={(event) => setInvestmentForm((current) => ({ ...current, amount: event.target.value }))} autoFocus /></label><label>{investmentKind === 'withdrawal' ? 'Date taken' : 'Date of investment'}<input type="date" value={investmentForm.date} onChange={(event) => setInvestmentForm((current) => ({ ...current, date: event.target.value }))} /></label></div><label className="full-label investment-note-label">Note<textarea value={investmentForm.note} onChange={(event) => setInvestmentForm((current) => ({ ...current, note: event.target.value }))} rows="4" /></label>{investmentError && <p className="error-message form-error" role="alert">{investmentError}</p>}<footer className="modal-actions"><button type="button" className="cancel-button" onClick={() => setInvestmentInvestor(null)} disabled={investmentSaving}>Cancel</button><button type="submit" className="add-investor-button" disabled={investmentSaving}>{investmentSaving ? 'Saving…' : editingInvestmentId ? 'Save changes' : 'Save and download PDF receipt'}</button></footer></form></section></div>}
 
       {modalOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeModal() }}>
         <section className="investor-modal" role="dialog" aria-modal="true" aria-labelledby="investor-modal-title">
-          <header className="modal-header"><div><p className="investors-eyebrow">INVESTOR REGISTER</p><h2 id="investor-modal-title">Add investor</h2></div><button className="modal-close" onClick={closeModal} aria-label="Close" disabled={saving}>×</button></header>
+          <header className="modal-header"><div><p className="investors-eyebrow">INVESTOR REGISTER</p><h2 id="investor-modal-title">{editingInvestorId ? 'Edit investor' : 'Add investor'}</h2></div><button className="modal-close" onClick={closeModal} aria-label="Close" disabled={saving}>×</button></header>
           <form className="investor-form" onSubmit={handleSubmit}>
             <div className="form-section-title">Investor details</div>
             <div className="form-two-col">
@@ -431,10 +501,10 @@ function InvestorsPage() {
                 {form.inheritorContactNumbers.length > 1 && <button type="button" onClick={() => removePhone('inheritorContactNumbers', index)} aria-label={`Remove inheritor number ${index + 1}`}>×</button>}
               </div>)}
             </div>
-            <div className="form-section-title inheritor-section-title">Initial investment</div>
-            <div className="form-two-col"><label>Amount of investment<input type="number" min="0.01" step="0.01" value={form.initialAmount} onChange={(event) => updateField('initialAmount', event.target.value)} /></label><label>Date of investment<input type="date" value={form.initialDate} onChange={(event) => updateField('initialDate', event.target.value)} /></label></div>
-            <label className="full-label investment-note-label">Investment note<textarea rows="3" value={form.initialNote} onChange={(event) => updateField('initialNote', event.target.value)} /></label>
-            <div className="nic-upload-section">
+            {!editingInvestorId && <div className="form-section-title inheritor-section-title">Initial investment</div>}
+            {!editingInvestorId && <div className="form-two-col"><label>Amount of investment<input type="number" min="0.01" step="0.01" value={form.initialAmount} onChange={(event) => updateField('initialAmount', event.target.value)} /></label><label>Date of investment<input type="date" value={form.initialDate} onChange={(event) => updateField('initialDate', event.target.value)} /></label></div>}
+            {!editingInvestorId && <label className="full-label investment-note-label">Investment note<textarea rows="3" value={form.initialNote} onChange={(event) => updateField('initialNote', event.target.value)} /></label>}
+            {(!editingInvestorId || !investors.find((item) => item.id === editingInvestorId)?.nic_r2_key) && <div className="nic-upload-section">
               <div><span className="form-section-title">NID document</span><p>Attach a PDF or image of the NID. Maximum 10 MB.</p></div>
               <label className="file-picker">{form.nicFile ? <span>{form.nicFile.name}</span> : <span>Choose PDF or image</span>}<input type="file" accept="application/pdf,image/*,.pdf" onChange={(event) => {
                 const file = event.target.files?.[0] ?? null
@@ -446,9 +516,9 @@ function InvestorsPage() {
                 setFormError('')
                 updateField('nicFile', file)
               }} /></label>
-            </div>
+            </div>}
             {formError && <p className="error-message form-error" role="alert">{formError}</p>}
-            <footer className="modal-actions"><button type="button" className="cancel-button" onClick={closeModal} disabled={saving}>Cancel</button><button type="submit" className="add-investor-button" disabled={saving}>{saving ? 'Saving…' : 'Save investor'}</button></footer>
+            <footer className="modal-actions"><button type="button" className="cancel-button" onClick={closeModal} disabled={saving}>Cancel</button><button type="submit" className="add-investor-button" disabled={saving}>{saving ? 'Saving…' : editingInvestorId ? 'Save changes' : 'Save investor'}</button></footer>
           </form>
         </section>
       </div>}

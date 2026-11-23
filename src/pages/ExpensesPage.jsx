@@ -33,6 +33,7 @@ function ExpensesPage() {
   const [activeType, setActiveType] = useState('')
   const [selectedType, setSelectedType] = useState('')
   const [form, setForm] = useState(newExpense)
+  const [editingExpenseId, setEditingExpenseId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -120,21 +121,64 @@ function ExpensesPage() {
       return
     }
     if (form.file && !workerUrl) { setError('The document Worker URL is not configured.'); setBusy(false); return }
-    const { data, error: saveError } = await supabase.from('project_expenses').insert({
+    const payload = {
       project_id: projectId, expense_type: activeType, expense_date: form.expense_date || null,
       amount: form.amount === '' ? null : Number(form.amount), note: form.note.trim(),
-    }).select('id').single()
+    }
+    const { data, error: saveError } = await (editingExpenseId ? supabase.from('project_expenses').update({ expense_date: payload.expense_date, amount: payload.amount, note: payload.note }).eq('id', editingExpenseId) : supabase.from('project_expenses').insert(payload)).select('id').single()
     if (saveError) { setError(saveError.message); setBusy(false); return }
     if (form.file) {
       try { await upload(data.id, form.file) }
       catch (uploadError) { setError(`Expense saved, but its attachment failed: ${uploadError.message}`) }
     }
+    const wasEditing = Boolean(editingExpenseId)
     setForm(newExpense())
+    setEditingExpenseId(null)
     setActiveType('')
     setSelectedType(activeType)
     await load()
-    if (!form.file) setNotice('Expense added successfully.')
+    if (!form.file) setNotice(wasEditing ? 'Expense updated successfully.' : 'Expense added successfully.')
     setBusy(false)
+  }
+
+
+  function editExpense(item) {
+    setEditingExpenseId(item.id)
+    setActiveType(item.expense_type)
+    setForm({ expense_date: item.expense_date || '', amount: String(item.amount), note: item.note || '', file: null })
+    setError('')
+  }
+
+  async function deleteExpense(item) {
+    if (!window.confirm('Delete this expense and its attachment?')) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const attachment = documents.find((document) => document.expense_id === item.id)
+      if (attachment) await deleteExpenseDocument(attachment, false)
+      const { error: deleteError } = await supabase.from('project_expenses').delete().eq('id', item.id)
+      if (deleteError) throw deleteError
+      await load()
+      setNotice('Expense deleted.')
+    } catch (deleteError) { setError(deleteError.message) }
+    setBusy(false)
+  }
+
+  async function renameExpenseDocument(document) {
+    const name = window.prompt('Document name', document.file_name)?.trim()
+    if (!name || name === document.file_name) return
+    const { error: renameError } = await supabase.from('project_documents').update({ file_name: name }).eq('id', document.id)
+    if (renameError) setError(renameError.message)
+    else { await load(); setNotice('Attachment renamed.') }
+  }
+
+  async function deleteExpenseDocument(document, refresh = true) {
+    if (!workerUrl) throw new Error('The document Worker URL is not configured.')
+    const response = await fetch(`${workerUrl}/projects/${projectId}/documents/${document.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await accessToken()}` } })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}))
+      throw new Error(body.error || 'Could not delete attachment.')
+    }
+    if (refresh) { await load(); setNotice('Attachment deleted.') }
   }
 
   async function previewDocument(document) {
@@ -174,16 +218,16 @@ function ExpensesPage() {
           <button type="button" className="expense-type-choice" aria-current={currentType === key ? 'true' : undefined} onClick={() => setSelectedType(key)}><span className="expense-type-name">{label}</span><span className="expense-type-meta">{key === 'tax' ? `${taxRate}% · ${money(taxAmount)}` : `${items.length} ${items.length === 1 ? 'entry' : 'entries'} · ${money(items.reduce((sum, item) => sum + Number(item.amount), 0))}`}</span></button>
           <label className="expense-switch"><input type="checkbox" checked={enabled} disabled={busy} aria-label={`${label} expenses for ${project?.name}`} onChange={(event) => toggle(key, event.target.checked)} /><span className="expense-switch-track" aria-hidden="true" /><span className="expense-switch-state">{enabled ? 'On' : 'Off'}</span></label>
         </div>
-      })}</div><div className="expense-detail"><div className="expense-detail-header"><div><p className="expense-step">STEP 2 · REVIEW AND ADD</p><h2>{labels[currentType]}</h2><p>{currentType === 'tax' ? 'Calculated from this project’s total price and included in expenses when Tax is on.' : selectedEnabled ? `${selectedExpenses.length} ${selectedExpenses.length === 1 ? 'entry' : 'entries'} recorded for this project` : 'This type is off for this project. Turn it on to add expenses.'}</p></div>{selectedEnabled && currentType !== 'tax' && <button className="add-investor-button" onClick={() => { setActiveType(currentType); setForm(newExpense()); setError('') }}>+ Add expense</button>}</div>
+      })}</div><div className="expense-detail"><div className="expense-detail-header"><div><p className="expense-step">STEP 2 · REVIEW AND ADD</p><h2>{labels[currentType]}</h2><p>{currentType === 'tax' ? 'Calculated from this project’s total price and included in expenses when Tax is on.' : selectedEnabled ? `${selectedExpenses.length} ${selectedExpenses.length === 1 ? 'entry' : 'entries'} recorded for this project` : 'This type is off for this project. Turn it on to add expenses.'}</p></div>{selectedEnabled && currentType !== 'tax' && <button className="add-investor-button" onClick={() => { setEditingExpenseId(null); setActiveType(currentType); setForm(newExpense()); setError('') }}>+ Add expense</button>}</div>
         {currentType === 'tax' && <form className="tax-form" onSubmit={saveTax}><label>Tax percentage<div className="tax-input"><input type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(event) => setTaxRate(event.target.value)} /><span>%</span></div></label><div className="tax-calculation"><span>{money(project?.total_price || 0)} × {taxRate || 0}%</span><strong>{money(taxAmount)}</strong><small>{taxEnabled ? 'Included in total expenses' : 'Turn on Tax to include this amount'}</small></div><button className="add-investor-button" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save tax rate'}</button></form>}
         {currentType !== 'tax' && (selectedExpenses.length ? <div className="expense-records">{selectedExpenses.map((item) => {
           const attachment = documents.find((document) => document.expense_id === item.id)
-          return <div className="expense-record" key={item.id}><div><strong>{money(item.amount)}</strong><span>{item.expense_date}</span>{item.note && <p>{item.note}</p>}</div>{attachment && <button type="button" onClick={() => previewDocument(attachment)}>View {attachment.file_name}</button>}</div>
+          return <div className="expense-record" key={item.id}><div><strong>{money(item.amount)}</strong><span>{item.expense_date}</span>{item.note && <p>{item.note}</p>}</div><div className="record-actions"><button type="button" onClick={() => editExpense(item)}>Edit</button><button type="button" className="record-delete" onClick={() => deleteExpense(item)}>Delete</button>{attachment && <><button type="button" onClick={() => previewDocument(attachment)}>View {attachment.file_name}</button><button type="button" onClick={() => renameExpenseDocument(attachment)}>Rename attachment</button><button type="button" className="record-delete" onClick={async () => { if (!window.confirm(`Delete ${attachment.file_name}?`)) return; try { await deleteExpenseDocument(attachment) } catch (deleteError) { setError(deleteError.message) } }}>Delete attachment</button></>}</div></div>
         })}</div> : <div className="expense-detail-empty"><strong>No {labels[currentType].toLowerCase()} expenses yet</strong><p>{selectedEnabled ? 'Use Add expense to record the first one.' : 'Switch this type on when the project needs it.'}</p></div>)}
       </div></div>
     </>}
     <DocumentPreview preview={preview} onClose={closePreview} />
-    {activeType && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setActiveType('') }}><section className="investor-modal" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title"><header className="modal-header"><div><p className="investors-eyebrow">{project?.name}</p><h2 id="expense-modal-title">Add {labels[activeType]} expense</h2></div><button className="modal-close" disabled={busy} onClick={() => setActiveType('')} aria-label="Close">×</button></header><form className="investor-form" onSubmit={saveExpense}><div className="form-two-col"><label>Date<input type="date" value={form.expense_date} onChange={(event) => setForm({ ...form, expense_date: event.target.value })} /></label><label>Amount<input type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label></div><label className="full-label investment-note-label">Note<textarea rows="3" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label><label className="expense-upload">Document attachment (optional)<input type="file" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.txt" onChange={(event) => setForm({ ...form, file: event.target.files?.[0] || null })} /><small>Up to 10 MB</small></label><footer className="modal-actions"><button type="button" className="cancel-button" disabled={busy} onClick={() => setActiveType('')}>Cancel</button><button type="submit" className="add-investor-button" disabled={busy}>{busy ? 'Saving…' : 'Save expense'}</button></footer></form></section></div>}
+    {activeType && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setActiveType('') }}><section className="investor-modal" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title"><header className="modal-header"><div><p className="investors-eyebrow">{project?.name}</p><h2 id="expense-modal-title">{editingExpenseId ? 'Edit' : 'Add'} {labels[activeType]} expense</h2></div><button className="modal-close" disabled={busy} onClick={() => setActiveType('')} aria-label="Close">×</button></header><form className="investor-form" onSubmit={saveExpense}><div className="form-two-col"><label>Date<input type="date" value={form.expense_date} onChange={(event) => setForm({ ...form, expense_date: event.target.value })} /></label><label>Amount<input type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label></div><label className="full-label investment-note-label">Note<textarea rows="3" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label><label className="expense-upload">Document attachment (optional)<input type="file" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.txt" onChange={(event) => setForm({ ...form, file: event.target.files?.[0] || null })} /><small>Up to 10 MB</small></label><footer className="modal-actions"><button type="button" className="cancel-button" disabled={busy} onClick={() => setActiveType('')}>Cancel</button><button type="submit" className="add-investor-button" disabled={busy}>{busy ? 'Saving…' : editingExpenseId ? 'Save changes' : 'Save expense'}</button></footer></form></section></div>}
   </section>
 }
 

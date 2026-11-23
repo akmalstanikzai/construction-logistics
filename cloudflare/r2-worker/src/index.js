@@ -11,7 +11,7 @@ function json(body, status, origin) {
 function corsHeaders(origin, extra = {}) {
   return {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',
@@ -50,7 +50,7 @@ const PROJECT_FILE_TYPES = new Set([
 
 async function projectDocumentRequest(request, env, origin, projectId, documentId) {
   if (!UUID_RE.test(projectId) || (documentId && !UUID_RE.test(documentId))) return json({ error: 'Not found' }, 404, origin)
-  if (documentId ? request.method !== 'GET' : request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin)
+  if (documentId ? !['GET', 'DELETE'].includes(request.method) : request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin)
   const user = await authenticatedUser(request, env)
   if (!user?.id) return json({ error: 'Sign in required' }, 401, origin)
   const authorization = request.headers.get('Authorization')
@@ -92,6 +92,12 @@ async function projectDocumentRequest(request, env, origin, projectId, documentI
   if (!documentResponse.ok) return json({ error: 'Could not verify document access' }, 502, origin)
   const [document] = await documentResponse.json()
   if (!document) return json({ error: 'Document not found' }, 404, origin)
+  if (request.method === 'DELETE') {
+    const deleted = await supabaseRequest(`project_documents?id=eq.${documentId}&project_id=eq.${projectId}&select=id`, env, authorization, { method: 'DELETE', headers: { Prefer: 'return=representation' } })
+    if (!deleted.ok || !(await deleted.json()).length) return json({ error: 'Could not delete document record' }, 502, origin)
+    await env.NIC_DOCUMENTS.delete(document.r2_key)
+    return json({ deleted: true }, 200, origin)
+  }
   const object = await env.NIC_DOCUMENTS.get(document.r2_key)
   if (!object) return json({ error: 'Document file not found' }, 404, origin)
   const safeName = document.file_name.replace(/[^a-z0-9._ -]/gi, '_').replace(/["\r\n]/g, '_')
@@ -117,7 +123,7 @@ export default {
     }
     const match = path.match(/^\/investors\/([0-9a-f-]+)\/nic$/i)
     if (!match || !UUID_RE.test(match[1])) return json({ error: 'Not found' }, 404, origin)
-    if (!['GET', 'POST'].includes(request.method)) return json({ error: 'Method not allowed' }, 405, origin)
+    if (!['GET', 'POST', 'DELETE'].includes(request.method)) return json({ error: 'Method not allowed' }, 405, origin)
 
     try {
       const user = await authenticatedUser(request, env)
@@ -165,6 +171,14 @@ export default {
       }
 
       if (!investor.nic_r2_key) return json({ error: 'No NID document is attached' }, 404, origin)
+      if (request.method === 'DELETE') {
+        const update = await supabaseRequest(`investors?id=eq.${investorId}&nic_r2_key=eq.${encodeURIComponent(investor.nic_r2_key)}&select=id`, env, authorization, {
+          method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ nic_r2_key: null }),
+        })
+        if (!update.ok || !(await update.json()).length) return json({ error: 'Could not unlink NID document' }, 502, origin)
+        await env.NIC_DOCUMENTS.delete(investor.nic_r2_key)
+        return json({ deleted: true }, 200, origin)
+      }
       const object = await env.NIC_DOCUMENTS.get(investor.nic_r2_key)
       if (!object) return json({ error: 'NID document was not found in R2' }, 404, origin)
       const contentType = object.httpMetadata?.contentType || 'application/pdf'

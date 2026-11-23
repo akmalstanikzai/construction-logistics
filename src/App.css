@@ -430,6 +430,11 @@ form label { display: block; margin-bottom: 9px; font-size: 12px; color: #334a62
 .profit-loss-note { color:#a44747; font-size:13px; }
 .profit-loss-toggle { display:flex; align-items:center; gap:9px; padding:13px 0; color:#385a76; font-size:13px; }
 .profit-loss-toggle input { width:16px; height:16px; }
+.record-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.record-actions button, .record-document > .record-delete { padding:6px 10px; border:1px solid #cedce7; border-radius:7px; background:#fff; color:#285676; cursor:pointer; }
+.record-actions .record-delete, .record-document > .record-delete, .receipt-actions .record-delete { color:#ad3e3e; border-color:#efd0d0; }
+.record-document { display:flex; align-items:center; gap:8px; }
+.record-document > button:first-child { flex:1; }
 @media(max-width:900px) { .profit-grid { grid-template-columns:1fr; } }
 @media(max-width:600px) { .profit-summary { grid-template-columns:1fr; } .profit-picker { align-items:stretch; flex-direction:column; } .profit-rate { grid-template-columns:1fr 100px 90px; } .profit-panel { padding:17px; } }
 .tax-form { display:flex; flex-wrap:wrap; align-items:end; gap:18px; padding:22px; }
