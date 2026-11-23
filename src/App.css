@@ -428,6 +428,8 @@ form label { display: block; margin-bottom: 9px; font-size: 12px; color: #334a62
 .profit-rate strong { text-align:right; color:#173e61; }
 .profit-panel > .add-investor-button { margin-top:16px; }
 .profit-loss-note { color:#a44747; font-size:13px; }
+.profit-loss-toggle { display:flex; align-items:center; gap:9px; padding:13px 0; color:#385a76; font-size:13px; }
+.profit-loss-toggle input { width:16px; height:16px; }
 @media(max-width:900px) { .profit-grid { grid-template-columns:1fr; } }
 @media(max-width:600px) { .profit-summary { grid-template-columns:1fr; } .profit-picker { align-items:stretch; flex-direction:column; } .profit-rate { grid-template-columns:1fr 100px 90px; } .profit-panel { padding:17px; } }
 .tax-form { display:flex; flex-wrap:wrap; align-items:end; gap:18px; padding:22px; }
