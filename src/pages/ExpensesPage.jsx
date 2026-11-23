@@ -15,6 +15,7 @@ const labels = Object.fromEntries(types)
 const workerUrl = import.meta.env.VITE_R2_WORKER_URL?.replace(/\/$/, '')
 const newExpense = () => ({ expense_date: '', amount: '', note: '', file: null })
 const money = (value) => Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const round = (value) => Math.round((value + Number.EPSILON) * 100) / 100
 
 async function accessToken() {
   const { data: { session } } = await supabase.auth.getSession()
@@ -74,13 +75,14 @@ function ExpensesPage() {
   async function saveTax(event) {
     event.preventDefault()
     const rate = Number(taxRate)
-    if (!Number.isFinite(rate) || rate < 0 || rate > 100) { setError('Enter a tax percentage from 0 to 100.'); return }
+    if (taxRate === '' || !Number.isFinite(rate) || rate < 0 || rate > 100) { setError('Enter a tax percentage from 0 to 100.'); return }
     setBusy(true); setError(''); setNotice('')
     const existing = financialSettings.find((item) => item.project_id === projectId)
-    const row = { project_id: projectId, tax_percentage: rate, charity_percentage: existing?.charity_percentage ?? 2.5, investor_percentage: existing?.investor_percentage ?? 20 }
-    const { error: saveError } = await supabase.from('project_financial_settings').upsert(row)
+    const { error: saveError } = existing
+      ? await supabase.from('project_financial_settings').update({ tax_percentage: rate }).eq('project_id', projectId)
+      : await supabase.from('project_financial_settings').insert({ project_id: projectId, tax_percentage: rate, investor_percentage: projects.find((item) => item.id === projectId)?.project_base === 'Muzarebah' ? 15 : 20 })
     if (saveError) setError(saveError.message)
-    else { setFinancialSettings((current) => [...current.filter((item) => item.project_id !== projectId), row]); setNotice('Tax percentage saved for this project.') }
+    else { setFinancialSettings((current) => [...current.filter((item) => item.project_id !== projectId), { ...existing, project_id: projectId, tax_percentage: rate }]); setNotice('Tax percentage saved for this project.') }
     setBusy(false)
   }
 
@@ -192,20 +194,19 @@ function ExpensesPage() {
   }
 
   const project = projects.find((item) => item.id === projectId)
-  const isMurabeha = project?.project_base === 'Murabeha'
   const projectExpenses = expenses.filter((item) => item.project_id === projectId)
   const recordedTotal = projectExpenses.reduce((sum, item) => sum + Number(item.amount), 0)
-  const taxEnabled = isMurabeha && settings.some((item) => item.project_id === projectId && item.expense_type === 'tax' && item.enabled)
-  const taxAmount = taxEnabled ? Math.round(Number(project?.total_price || 0) * Number(taxRate || 0)) / 100 : 0
+  const taxEnabled = settings.some((item) => item.project_id === projectId && item.expense_type === 'tax' && item.enabled)
+  const taxAmount = taxEnabled ? round(Number(project?.total_price || 0) * Number(taxRate || 0) / 100) : 0
   const total = recordedTotal + taxAmount
-  const availableTypes = isMurabeha ? types : types.filter(([key]) => key !== 'tax')
+  const availableTypes = types
   const enabledTypes = availableTypes.filter(([key]) => settings.some((item) => item.project_id === projectId && item.expense_type === key && item.enabled))
   const currentType = selectedType && availableTypes.some(([key]) => key === selectedType) ? selectedType : enabledTypes[0]?.[0] || availableTypes[0][0]
   const selectedExpenses = projectExpenses.filter((item) => item.expense_type === currentType)
   const selectedEnabled = enabledTypes.some(([key]) => key === currentType)
 
   return <section className="investors-page expenses-page" aria-label="Project expenses">
-    <header className="investors-header"><div><p className="investors-eyebrow">ASMA AFGHAN</p><h1>Expenses</h1><p className="investors-subtitle">Manage expense types and records for each project. Murabeha tax is calculated by percentage.</p></div></header>
+    <header className="investors-header"><div><p className="investors-eyebrow">ASMA AFGHAN</p><h1>Expenses</h1><p className="investors-subtitle">Manage expense types and records for each project. Tax is calculated as a percentage of the project total.</p></div></header>
     {notice && <div className="investors-notice" role="status">{notice}</div>}
     {error && <div className="investors-alert" role="alert">{error}</div>}
     {loading ? <div className="investors-state"><span className="loader" /></div> : !projects.length ? <div className="investors-empty"><h2>No projects yet</h2><p>Add a project before recording expenses.</p></div> : <>
