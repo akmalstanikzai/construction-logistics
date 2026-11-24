@@ -13,6 +13,10 @@ function Sidebar({ onSignOut, page, onNavigate }) {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5V8.7L12 4l8 4.7v10.8M8.5 19.5v-6h7v6M2.8 9.2 12 3.8l9.2 5.4" /></svg>
           <span>Investors</span>
         </a>
+        <a className={`sidebar-link ${page === 'muzaribs' ? 'active' : ''}`} href="#muzaribs" aria-label="Muzaribs" aria-current={page === 'muzaribs' ? 'page' : undefined} onClick={(event) => { event.preventDefault(); onNavigate('muzaribs') }}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM4 21v-2a8 8 0 0 1 16 0v2H4Z" /></svg>
+          <span>Muzaribs</span>
+        </a>
         <a className={`sidebar-link ${page === 'projects' ? 'active' : ''}`} href="#projects" aria-label="Projects" aria-current={page === 'projects' ? 'page' : undefined} onClick={(event) => { event.preventDefault(); onNavigate('projects') }}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v13H3zM7 7V4h10v3M7 12h10M7 16h7" /></svg>
           <span>Projects</span>

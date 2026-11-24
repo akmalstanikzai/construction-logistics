@@ -121,17 +121,18 @@ export default {
       try { return await projectDocumentRequest(request, env, origin, projectMatch[1], projectMatch[2]) }
       catch (error) { console.error('Project document request failed', error); return json({ error: 'The document service encountered an error' }, 500, origin) }
     }
-    const match = path.match(/^\/investors\/([0-9a-f-]+)\/nic$/i)
-    if (!match || !UUID_RE.test(match[1])) return json({ error: 'Not found' }, 404, origin)
+    const match = path.match(/^\/(investors|muzaribs)\/([0-9a-f-]+)\/nic$/i)
+    if (!match || !UUID_RE.test(match[2])) return json({ error: 'Not found' }, 404, origin)
     if (!['GET', 'POST', 'DELETE'].includes(request.method)) return json({ error: 'Method not allowed' }, 405, origin)
 
     try {
       const user = await authenticatedUser(request, env)
       if (!user?.id) return json({ error: 'Sign in required' }, 401, origin)
 
-      const investorId = match[1]
+      const investorId = match[2]
+      const collection = match[1]
       const authorization = request.headers.get('Authorization')
-      const investorQuery = `investors?id=eq.${investorId}&select=id,nic_r2_key&limit=1`
+      const investorQuery = `${collection}?id=eq.${investorId}&select=id,nic_r2_key&limit=1`
       const investorResponse = await supabaseRequest(investorQuery, env, authorization)
       if (!investorResponse.ok) return json({ error: 'Could not verify investor access' }, 502, origin)
       const [investor] = await investorResponse.json()
@@ -150,13 +151,13 @@ export default {
         const bytes = new Uint8Array(await file.slice(0, 5).arrayBuffer())
         if (contentType === 'application/pdf' && new TextDecoder().decode(bytes) !== '%PDF-') return json({ error: 'The selected file is not a valid PDF' }, 415, origin)
 
-        const key = `investors/${investorId}/${crypto.randomUUID()}`
+        const key = `${collection}/${investorId}/${crypto.randomUUID()}`
         const storedObject = await env.NIC_DOCUMENTS.put(key, file, {
           httpMetadata: { contentType },
           customMetadata: { investorId, uploadedBy: user.id },
         })
         if (!storedObject) return json({ error: 'R2 did not save the document' }, 502, origin)
-        const updateQuery = `investors?id=eq.${investorId}&nic_r2_key=is.null&select=id,nic_r2_key`
+        const updateQuery = `${collection}?id=eq.${investorId}&nic_r2_key=is.null&select=id,nic_r2_key`
         const updateResponse = await supabaseRequest(updateQuery, env, authorization, {
           method: 'PATCH',
           headers: { Prefer: 'return=representation' },
@@ -172,7 +173,7 @@ export default {
 
       if (!investor.nic_r2_key) return json({ error: 'No NID document is attached' }, 404, origin)
       if (request.method === 'DELETE') {
-        const update = await supabaseRequest(`investors?id=eq.${investorId}&nic_r2_key=eq.${encodeURIComponent(investor.nic_r2_key)}&select=id`, env, authorization, {
+        const update = await supabaseRequest(`${collection}?id=eq.${investorId}&nic_r2_key=eq.${encodeURIComponent(investor.nic_r2_key)}&select=id`, env, authorization, {
           method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ nic_r2_key: null }),
         })
         if (!update.ok || !(await update.json()).length) return json({ error: 'Could not unlink NID document' }, 502, origin)

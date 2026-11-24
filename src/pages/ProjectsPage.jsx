@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import DocumentPreview from '../components/DocumentPreview'
 
-const emptyProject = { name: '', code_number: '', organization: '', location: '', total_price: '', project_base: '', start_date: '', end_date: '', status: 'in_progress', note: '', files: [] }
+const emptyProject = { name: '', code_number: '', organization: '', location: '', total_price: '', project_base: '', start_date: '', end_date: '', status: 'in_progress', note: '', muzarib_id: '', files: [] }
 const statusLabels = { in_progress: 'In progress', submitted: 'Submitted', completed: 'Completed' }
 const workerUrl = import.meta.env.VITE_R2_WORKER_URL?.replace(/\/$/, '')
 
@@ -18,6 +18,7 @@ async function token() {
 
 function ProjectsPage() {
   const [projects, setProjects] = useState([])
+  const [muzaribs, setMuzaribs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -34,7 +35,7 @@ function ProjectsPage() {
 
   const loadProjects = useCallback(async () => {
     const { data: rows, error: projectError } = await supabase.from('projects')
-      .select('id, name, code_number, organization, location, total_price, project_base, start_date, end_date, status, note, created_at')
+      .select('id, name, code_number, organization, location, total_price, project_base, muzarib_id, start_date, end_date, status, note, created_at')
       .order('created_at', { ascending: false })
     if (projectError) { setError(projectError.message); setLoading(false); return }
     if (!rows.length) { setProjects([]); setError(''); setLoading(false); return }
@@ -53,6 +54,7 @@ function ProjectsPage() {
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- Load projects on mount.
     loadProjects()
+    supabase.from('muzaribs').select('id, first_name, last_name').order('last_name').then(({ data, error: listError }) => { if (listError) setError(listError.message); else setMuzaribs(data) })
   }, [loadProjects])
 
   async function uploadDocument(projectId, file) {
@@ -71,11 +73,12 @@ function ProjectsPage() {
     setError('')
     setNotice('')
     if (form.start_date && form.end_date && form.end_date < form.start_date) { setError('End date must be on or after the start date.'); return }
+    if (form.project_base === 'Muzarebah' && !form.muzarib_id) { setError('Select a Muzarib for this project.'); return }
     if (form.files.length && !workerUrl) { setError('The document Worker URL is not configured.'); return }
     setSaving(true)
     const payload = {
       name: form.name.trim() || null, code_number: form.code_number.trim() || null, organization: form.organization.trim() || null, location: form.location.trim() || null,
-      total_price: form.total_price === '' ? null : Number(form.total_price), project_base: form.project_base || null, start_date: form.start_date || null, end_date: form.end_date || null, status: form.status, note: form.note.trim(),
+      total_price: form.total_price === '' ? null : Number(form.total_price), project_base: form.project_base || null, muzarib_id: form.project_base === 'Muzarebah' ? form.muzarib_id : null, start_date: form.start_date || null, end_date: form.end_date || null, status: form.status, note: form.note.trim(),
     }
     const { data: project, error: createError } = await (editingId ? supabase.from('projects').update(payload).eq('id', editingId) : supabase.from('projects').insert(payload)).select('id').single()
     if (createError) { setError(createError.message); setSaving(false); return }
@@ -97,7 +100,7 @@ function ProjectsPage() {
 
   function editProject(project) {
     setEditingId(project.id)
-    setForm({ ...emptyProject, ...project, total_price: String(project.total_price ?? ''), start_date: project.start_date || '', end_date: project.end_date || '', files: [] })
+    setForm({ ...emptyProject, ...project, total_price: String(project.total_price ?? ''), start_date: project.start_date || '', end_date: project.end_date || '', muzarib_id: project.muzarib_id || '', files: [] })
     setError('')
     setModalOpen(true)
   }
@@ -185,7 +188,7 @@ function ProjectsPage() {
       return <article className="investor-card project-card" key={project.id}>
         <div className="project-card-main"><div className="project-icon" aria-hidden="true">▤</div><div className="project-title"><h2>{project.name}</h2><p>{project.code_number} · {project.organization}</p></div><span className={`project-status status-${project.status}`}>{statusLabels[project.status]}</span></div>
         <div className="project-card-summary"><div><span>Location</span><strong>{project.location}</strong></div><div><span>Total price</span><strong>{formatPrice(project.total_price)}</strong></div><div><span>Dates</span><strong>{project.start_date} – {project.end_date}</strong></div><button type="button" className="investor-expand" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : project.id)}>{expanded ? 'Hide details' : 'View details'} <span aria-hidden="true">{expanded ? '⌃' : '⌄'}</span></button></div>
-        {expanded && <div className="project-expanded"><div className="project-status-control"><div className="record-actions"><button type="button" onClick={() => editProject(project)}>Edit project</button><button type="button" className="record-delete" disabled={updatingId === project.id} onClick={() => deleteProject(project)}>Delete project</button></div><label>Project status<select value={project.status} disabled={updatingId === project.id} onChange={(event) => updateStatus(project, event.target.value)}><option value="in_progress">In progress</option><option value="submitted">Submitted</option><option value="completed">Completed</option></select></label></div><div className="project-note"><span>Project base</span><p>{project.project_base || '—'}</p></div><div className="project-note"><span>Note</span><p>{project.note || '—'}</p></div><div className="project-doc-heading"><div><h3>Documents</h3><p>{project.documents.length} attached</p></div><label className="cancel-button project-attach">{uploadingId === project.id ? 'Uploading…' : '+ Attach documents'}<input type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.txt" disabled={uploadingId === project.id} onChange={(event) => attachDocuments(project, event)} /></label></div>{project.documents.length ? <div className="project-doc-list">{project.documents.map((document) => <div className="record-document" key={document.id}><button type="button" onClick={() => previewDocument(project, document)}><span>▤</span>{document.file_name}<small>View</small></button><button type="button" onClick={() => renameDocument(document)}>Rename</button><button type="button" className="record-delete" onClick={async () => { if (!window.confirm(`Delete ${document.file_name}?`)) return; try { await deleteDocument(project, document) } catch (deleteError) { setError(deleteError.message) } }}>Delete</button></div>)}</div> : <p className="investment-empty">No documents attached yet.</p>}</div>}
+        {expanded && <div className="project-expanded"><div className="project-status-control"><div className="record-actions"><button type="button" onClick={() => editProject(project)}>Edit project</button><button type="button" className="record-delete" disabled={updatingId === project.id} onClick={() => deleteProject(project)}>Delete project</button></div><label>Project status<select value={project.status} disabled={updatingId === project.id} onChange={(event) => updateStatus(project, event.target.value)}><option value="in_progress">In progress</option><option value="submitted">Submitted</option><option value="completed">Completed</option></select></label></div><div className="project-note"><span>Project base</span><p>{project.project_base || '—'}</p></div>{project.project_base === 'Muzarebah' && <div className="project-note"><span>Muzarib</span><p>{muzaribs.find((person) => person.id === project.muzarib_id)?.first_name} {muzaribs.find((person) => person.id === project.muzarib_id)?.last_name}</p></div>}<div className="project-note"><span>Note</span><p>{project.note || '—'}</p></div><div className="project-doc-heading"><div><h3>Documents</h3><p>{project.documents.length} attached</p></div><label className="cancel-button project-attach">{uploadingId === project.id ? 'Uploading…' : '+ Attach documents'}<input type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.txt" disabled={uploadingId === project.id} onChange={(event) => attachDocuments(project, event)} /></label></div>{project.documents.length ? <div className="project-doc-list">{project.documents.map((document) => <div className="record-document" key={document.id}><button type="button" onClick={() => previewDocument(project, document)}><span>▤</span>{document.file_name}<small>View</small></button><button type="button" onClick={() => renameDocument(document)}>Rename</button><button type="button" className="record-delete" onClick={async () => { if (!window.confirm(`Delete ${document.file_name}?`)) return; try { await deleteDocument(project, document) } catch (deleteError) { setError(deleteError.message) } }}>Delete</button></div>)}</div> : <p className="investment-empty">No documents attached yet.</p>}</div>}
       </article>
     })}</div>}
     <DocumentPreview preview={preview} onClose={closePreview} />
@@ -194,6 +197,7 @@ function ProjectsPage() {
       <div className="form-two-col project-form-row"><label>Respective organization<input value={form.organization} onChange={(event) => setForm({ ...form, organization: event.target.value })} /></label><label>Location<input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label></div>
       <div className="form-two-col project-form-row"><label>Total price<input type="number" min="0" step="0.01" value={form.total_price} onChange={(event) => setForm({ ...form, total_price: event.target.value })} /></label><label>Project status<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="in_progress">In progress</option><option value="submitted">Submitted</option><option value="completed">Completed</option></select></label></div>
       <label className="full-label">Project base<select value={form.project_base} onChange={(event) => setForm({ ...form, project_base: event.target.value })}><option value="">Select project base</option><option value="Muzarebah">Muzarebah</option><option value="Murabeha">Murabeha</option><option value="Musharekah">Musharekah</option></select></label>
+      {form.project_base === 'Muzarebah' && <label className="full-label">Muzarib<select required value={form.muzarib_id} onChange={(event) => setForm({ ...form, muzarib_id: event.target.value })}><option value="">Select Muzarib</option>{muzaribs.map((person) => <option key={person.id} value={person.id}>{person.first_name} {person.last_name}</option>)}</select></label>}
       <div className="form-two-col project-form-row"><label>Start date<input type="date" value={form.start_date} onChange={(event) => setForm({ ...form, start_date: event.target.value })} /></label><label>End date<input type="date" min={form.start_date || undefined} value={form.end_date} onChange={(event) => setForm({ ...form, end_date: event.target.value })} /></label></div>
       <label className="full-label investment-note-label">Note<textarea rows="3" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label>
       <label className="project-file-picker">Attach documents (contracts, PDFs, images, or office files)<input type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.txt" onChange={(event) => setForm({ ...form, files: Array.from(event.target.files ?? []) })} /><span>{form.files.length ? form.files.map((file) => file.name).join(', ') : 'Choose files · 10 MB each'}</span></label>
