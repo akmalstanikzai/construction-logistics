@@ -502,3 +502,58 @@ form label { display: block; margin-bottom: 9px; font-size: 12px; color: #334a62
 .profit-project-type { display:flex; align-items:center; gap:9px; padding:9px 12px; border:1px solid #d8e6f0; border-radius:9px; background:#eaf4fb; color:#4d7594; font-size:11px; }
 .profit-project-type strong { color:#1d608f; font-size:12px; }
 @media (max-width:600px) { .profit-project-type { align-self:flex-start; } }
+
+/* Responsive layout for all five workspace sections */
+:where(.dashboard-layout, .dashboard-content, .investors-page, .investor-card, .project-card-main, .project-card-summary, .investor-summary, .profit-panel, .expense-workspace) { min-width: 0; }
+:where(.project-title h2, .investor-name h2, .project-note p, .record-document button, .expense-detail-header h2) { overflow-wrap: anywhere; }
+:where(.investor-form input:not([type=file]), .investor-form select, .investor-form textarea, .profit-picker select, .expense-toolbar select) { max-width: 100%; }
+.record-actions button, .record-document button, .project-attach, .nic-button, .receipt-actions button { min-height: 40px; }
+
+@media (max-width: 680px) {
+  .dashboard-layout { padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
+  .dashboard-sidebar { height: calc(74px + env(safe-area-inset-bottom)); padding-inline: 6px; }
+  .sidebar-nav { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; }
+  .sidebar-link { width: 100%; min-height: 54px; gap: 4px; font-size: 9px; }
+  .sidebar-sign-out { width: 44px; flex: 0 0 44px; min-height: 54px; margin-left: 2px; }
+  .investors-header { align-items: flex-start; }
+  .investors-header > div { min-width: 0; flex: 1 1 170px; }
+  .investors-header .add-investor-button { min-height: 44px; white-space: normal; }
+  .investor-list-heading { gap: 8px; }
+  .investor-search { flex: 1 1 100%; }
+  .project-card-main > .project-status { max-width: 100%; white-space: normal; text-align: center; }
+  .project-card-summary > div { min-width: 0; }
+  .project-doc-heading { align-items: flex-start; flex-wrap: wrap; }
+  .project-doc-list .record-document { align-items: stretch; flex-wrap: wrap; }
+  .project-doc-list .record-document > button:first-child { min-width: 100%; }
+  .record-actions { gap: 8px; }
+  .profit-rate { grid-template-columns: minmax(0, 1fr) minmax(76px, 96px); }
+  .profit-rate > strong { grid-column: 1 / -1; text-align: right; }
+  .profit-line { align-items: flex-start; }
+  .modal-backdrop { align-items: end; padding: 8px 8px max(8px, env(safe-area-inset-bottom)); }
+  .investor-modal { width: 100%; max-height: calc(100dvh - 16px - env(safe-area-inset-bottom)); }
+  .modal-actions { gap: 8px; }
+  .modal-actions button { min-height: 44px; }
+}
+@media (max-width: 420px) {
+  .dashboard-content { padding: 8px; }
+  .investors-page { padding: 16px 12px; }
+  .investors-header { flex-direction: column; }
+  .investors-header > div { flex-basis: auto; }
+  .investors-header .add-investor-button { align-self: stretch; }
+  .investor-card { padding: 14px; }
+  .investor-overview { grid-template-columns: minmax(0, 1fr); }
+  .investor-summary, .project-card-summary { grid-template-columns: minmax(0, 1fr); }
+  .project-card-summary .investor-expand, .investor-summary .investor-expand { grid-column: auto; }
+  .project-status { margin-left: 0; }
+  .sidebar-link { font-size: 8px; }
+  .sidebar-link svg { width: 18px; height: 18px; }
+  .sidebar-sign-out { width: 38px; flex-basis: 38px; font-size: 8px; }
+  .profit-summary { grid-template-columns: minmax(0, 1fr); }
+  .profit-summary > div:last-child { grid-column: auto; }
+  .profit-rate { grid-template-columns: minmax(0, 1fr) minmax(76px, 90px); }
+}
+@media (max-height: 500px) and (max-width: 680px) {
+  .dashboard-sidebar { height: calc(62px + env(safe-area-inset-bottom)); }
+  .dashboard-layout { padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
+  .sidebar-link, .sidebar-sign-out { min-height: 46px; }
+}
