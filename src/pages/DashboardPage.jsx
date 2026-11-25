@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import Sidebar from '../components/Sidebar'
 import InvestorsPage from './InvestorsPage'
+import PartnersPage from './PartnersPage'
 import MuzaribsPage from './MuzaribsPage'
 import ProjectsPage from './ProjectsPage'
 import ExpensesPage from './ExpensesPage'
 import ProfitPage from './ProfitPage'
 
 function DashboardPage({ onSignOut }) {
-  const [page, setPage] = useState(['projects', 'expenses', 'profit', 'muzaribs'].includes(window.location.hash.slice(1)) ? window.location.hash.slice(1) : 'investors')
+  const [page, setPage] = useState(['projects', 'expenses', 'profit', 'muzaribs', 'partners'].includes(window.location.hash.slice(1)) ? window.location.hash.slice(1) : 'investors')
   useEffect(() => {
-    const syncPage = () => setPage(['projects', 'expenses', 'profit', 'muzaribs'].includes(window.location.hash.slice(1)) ? window.location.hash.slice(1) : 'investors')
+    const syncPage = () => setPage(['projects', 'expenses', 'profit', 'muzaribs', 'partners'].includes(window.location.hash.slice(1)) ? window.location.hash.slice(1) : 'investors')
     window.addEventListener('hashchange', syncPage)
     return () => window.removeEventListener('hashchange', syncPage)
   }, [])
@@ -21,7 +22,7 @@ function DashboardPage({ onSignOut }) {
     <main className="dashboard-layout">
       <Sidebar onSignOut={onSignOut} page={page} onNavigate={navigate} />
       <div className="dashboard-content">
-        {page === 'muzaribs' ? <MuzaribsPage /> : page === 'projects' ? <ProjectsPage /> : page === 'expenses' ? <ExpensesPage /> : page === 'profit' ? <ProfitPage /> : <InvestorsPage />}
+        {page === 'partners' ? <PartnersPage /> : page === 'muzaribs' ? <MuzaribsPage /> : page === 'projects' ? <ProjectsPage /> : page === 'expenses' ? <ExpensesPage /> : page === 'profit' ? <ProfitPage /> : <InvestorsPage />}
       </div>
     </main>
   )

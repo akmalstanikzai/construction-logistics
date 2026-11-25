@@ -17,6 +17,10 @@ function Sidebar({ onSignOut, page, onNavigate }) {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM4 21v-2a8 8 0 0 1 16 0v2H4Z" /></svg>
           <span>Muzaribs</span>
         </a>
+        <a className={`sidebar-link ${page === 'partners' ? 'active' : ''}`} href="#partners" aria-label="Partners" aria-current={page === 'partners' ? 'page' : undefined} onClick={(event) => { event.preventDefault(); onNavigate('partners') }}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM4 21v-2a8 8 0 0 1 16 0v2H4Z" /></svg>
+          <span>Partners</span>
+        </a>
         <a className={`sidebar-link ${page === 'projects' ? 'active' : ''}`} href="#projects" aria-label="Projects" aria-current={page === 'projects' ? 'page' : undefined} onClick={(event) => { event.preventDefault(); onNavigate('projects') }}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v13H3zM7 7V4h10v3M7 12h10M7 16h7" /></svg>
           <span>Projects</span>

@@ -121,7 +121,7 @@ export default {
       try { return await projectDocumentRequest(request, env, origin, projectMatch[1], projectMatch[2]) }
       catch (error) { console.error('Project document request failed', error); return json({ error: 'The document service encountered an error' }, 500, origin) }
     }
-    const match = path.match(/^\/(investors|muzaribs)\/([0-9a-f-]+)\/nic$/i)
+    const match = path.match(/^\/(investors|muzaribs|partners)\/([0-9a-f-]+)\/nic$/i)
     if (!match || !UUID_RE.test(match[2])) return json({ error: 'Not found' }, 404, origin)
     if (!['GET', 'POST', 'DELETE'].includes(request.method)) return json({ error: 'Method not allowed' }, 405, origin)
 

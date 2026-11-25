@@ -36,3 +36,11 @@ After Vercel gives you a production URL, add its exact origin (for example, `htt
 ## Projects
 
 Apply `supabase/migrations/202611080003_projects.sql` to create the projects and project document tables. The Projects page records name, code number, organization, location, price, dates, status, and note. Status can be updated after creation. Project attachments use the existing private R2 Worker and bucket; deploy the updated `cloudflare/r2-worker/src/index.js` before uploading or downloading project documents. Each attachment is limited to 10 MB. Supported formats are PDF, images, Word, Excel, and plain text.
+
+## Partners and Musharekah expense funding
+
+Apply `supabase/migrations/202611250001_partners.sql` after the earlier migrations, then deploy the updated R2 Worker and frontend. The Partners page stores names, phone and inheritor contacts, and one NID PDF/image per partner (up to 10 MB), following the Muzarib register.
+
+Musharekah projects require one or more registered partners. Each recorded expense can be funded by a selected project partner or the shared investors balance. The Expenses page shows totals and percentages across all project expense categories. Existing expenses default to the investor pool. Automatic tax is shown separately as unassigned and included in the percentage denominator. Funding attribution does not create investment withdrawals or change investor deposit balances.
+
+Project details and partner selections save atomically. Partners with recorded expenses cannot be removed from a project until those expenses are reassigned; partner-funded projects cannot change base until their expenses are reassigned to investors.
