@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabase'
+import { allocateMusharekah } from '../lib/musharekah'
 import DocumentPreview from '../components/DocumentPreview'
 
 const types = [
@@ -205,12 +206,7 @@ function ExpensesPage() {
   const total = recordedTotal + taxAmount
   const isMusharekah = project?.project_base === 'Musharekah'
   const projectPartners = (project?.project_partners || []).map((link) => partners.find((person) => person.id === link.partner_id)).filter(Boolean)
-  const fundingTotals = [
-    { id: '', name: 'Investors balance' },
-    ...projectPartners.map((person) => ({ id: person.id, name: `${person.first_name} ${person.last_name}` })),
-  ].map((source) => ({ ...source, amount: projectExpenses.filter((item) => (item.funding_partner_id || '') === source.id).reduce((sum, item) => sum + Number(item.amount), 0) }))
-  // Automatic tax has no payer until a payment is recorded; keep it visible separately.
-  if (taxAmount) fundingTotals.push({ id: 'tax', name: 'Calculated tax (unassigned)', amount: taxAmount })
+  const { rows: fundingTotals } = allocateMusharekah(projectExpenses, projectPartners, 0)
   const availableTypes = types
   const enabledTypes = availableTypes.filter(([key]) => settings.some((item) => item.project_id === projectId && item.expense_type === key && item.enabled))
   const currentType = selectedType && availableTypes.some(([key]) => key === selectedType) ? selectedType : enabledTypes[0]?.[0] || availableTypes[0][0]
@@ -223,7 +219,7 @@ function ExpensesPage() {
     {error && <div className="investors-alert" role="alert">{error}</div>}
     {loading ? <div className="investors-state"><span className="loader" /></div> : !projects.length ? <div className="investors-empty"><h2>No projects yet</h2><p>Add a project before recording expenses.</p></div> : <>
       <div className="expense-toolbar"><label>Choose a project<select value={projectId} onChange={(event) => { setProjectId(event.target.value); setActiveType(''); setSelectedType(''); setNotice(''); setError('') }}>{projects.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.code_number}</option>)}</select></label><div className="expense-total"><span>Total recorded expenses</span><strong>{money(total)}</strong><small>{projectExpenses.length} recorded {projectExpenses.length === 1 ? 'entry' : 'entries'}{taxEnabled ? ' + tax' : ''}</small></div></div>
-      {isMusharekah && <section className="funding-summary" aria-label="Expenses by funding source"><h2>Expenses by funding source</h2><p>Each source’s share of all project expenses, across all expense types. Calculated tax is shown separately until paid.</p>{fundingTotals.map((source) => <div className="profit-line" key={source.id}><span>{source.name}</span><strong>{money(source.amount)} <small>({total > 0 ? (source.amount / total * 100).toFixed(2) : '0.00'}%)</small></strong></div>)}</section>}
+      {isMusharekah && <section className="funding-summary" aria-label="Expenses by funding source"><h2>Expenses by funding source</h2><p>Each source’s share of recorded expenses, including guarantees. These percentages determine profit and loss allocation. Calculated tax reduces the net result and is excluded from funding percentages.</p>{fundingTotals.map((source) => <div className="profit-line" key={source.id}><span>{source.name}</span><strong>{money(source.amount)} <small>({source.percentage.toFixed(2)}%)</small></strong></div>)}{taxAmount > 0 && <div className="profit-line"><span>Calculated tax (excluded from funding percentages)</span><strong>{money(taxAmount)}</strong></div>}</section>}
       <div className="expense-intro"><div><p className="expense-step">STEP 1 · CHOOSE A TYPE</p><h2>Expenses for {project?.name}</h2><p>Switch on the types this project needs. Choose a type to view its entries.</p></div><span className="expense-enabled-count">{enabledTypes.length} of {availableTypes.length} enabled</span></div>
       <div className="expense-workspace"><div className="expense-type-list">{availableTypes.map(([key, label]) => {
         const enabled = enabledTypes.some(([type]) => type === key)

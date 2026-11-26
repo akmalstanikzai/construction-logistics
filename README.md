@@ -41,6 +41,13 @@ Apply `supabase/migrations/202611080003_projects.sql` to create the projects and
 
 Apply `supabase/migrations/202611250001_partners.sql` after the earlier migrations, then deploy the updated R2 Worker and frontend. The Partners page stores names, phone and inheritor contacts, and one NID PDF/image per partner (up to 10 MB), following the Muzarib register.
 
-Musharekah projects require one or more registered partners. Each recorded expense can be funded by a selected project partner or the shared investors balance. The Expenses page shows totals and percentages across all project expense categories. Existing expenses default to the investor pool. Automatic tax is shown separately as unassigned and included in the percentage denominator. Funding attribution does not create investment withdrawals or change investor deposit balances.
+Musharekah projects require one or more registered partners. Each recorded expense can be funded by a selected project partner or the shared investors balance. The Expenses page shows totals and percentages across all project expense categories. Existing expenses default to the investor pool. Automatic tax is shown separately and excluded from the funding percentage denominator. Funding attribution does not create investment withdrawals or change investor deposit balances.
 
 Project details and partner selections save atomically. Partners with recorded expenses cannot be removed from a project until those expenses are reassigned; partner-funded projects cannot change base until their expenses are reassigned to investors.
+
+
+## Musharekah profit and loss
+
+The Profit & loss page divides the full net result among project partners and the shared investor pool using their recorded expense contributions. Guarantees count toward funding percentages but remain recoverable and are excluded from net expenses. Calculated tax reduces net profit (or increases net loss) without changing funding shares. For example, funding shares of 50%, 20%, and 30% receive those same proportions of either profit or loss. No charity or remuneration deductions are applied to this distribution.
+
+Allocations update when expenses change. Cent rounding preserves the full net result; projects without funded expenses display an unallocated state. Run the allocation tests with `node --test src/lib/musharekah.test.js`. This feature uses the existing partners migration and requires no additional database changes.

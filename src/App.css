@@ -566,3 +566,11 @@ form label { display: block; margin-bottom: 9px; font-size: 12px; color: #334a62
 .funding-summary h2 { margin: 0 0 8px; }
 .funding-summary > p { color: #61716b; line-height: 1.5; }
 .funding-summary .profit-line { flex-wrap: wrap; gap: 8px; }
+
+.musharekah-table-wrap { overflow-x: auto; margin-top: 20px; }
+.musharekah-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.musharekah-table th, .musharekah-table td { padding: 14px 10px; border-bottom: 1px solid #e0e7e4; text-align: right; }
+.musharekah-table th:first-child { text-align: left; min-width: 140px; }
+.musharekah-table td { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.musharekah-table thead th { color: #52665d; font-weight: 600; }
+.musharekah-table tfoot { font-weight: 700; }
